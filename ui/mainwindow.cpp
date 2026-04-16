@@ -325,29 +325,40 @@ void MainWindow::refreshUsageData()
             dailyAppSecondsByHour[hour][record.appName] += record.durationSeconds;
         }
     }
-
+    QVector<QHash<int, int>> dailyHourSeconds(7);
     for (const UsageRecord &record : weeklyRecords) {
         weeklyAppSeconds[record.appName] += record.durationSeconds;
         if (!record.appPath.isEmpty() && !m_appPathByName.contains(record.appName)) {
             m_appPathByName[record.appName] = record.appPath;
         }
         const QDate date = QDate::fromString(record.date, "yyyy-MM-dd");
-        if (!date.isValid()) {
-            continue;
-        }
+        if (!date.isValid()) continue;
         const int index = weekStart.daysTo(date);
-        if (index >= 0 && index < 7) {
-            m_weeklyMinutesByDay[index] += (record.durationSeconds + 59) / 60;
+        if (index < 0 || index >= 7) continue;
+
+        const QDateTime tracked = QDateTime::fromString(record.trackedAt, "yyyy-MM-dd HH:mm:ss");
+        if (!tracked.isValid()) continue;
+        const int hour = tracked.time().hour();
+
+        int &slot = dailyHourSeconds[index][hour];
+        slot += record.durationSeconds;
+    }
+
+    for (int i = 0; i < 7; ++i) {
+        int total = 0;
+        for (auto secs : dailyHourSeconds[i]) {
+            total += secs / 60;
         }
+        m_weeklyMinutesByDay[i] = total;
     }
 
     for (int hour = 0; hour < dailySecondsByHour.size(); ++hour) {
-        m_dailyMinutesByHour[hour] = (dailySecondsByHour[hour] + 59) / 60;
+        m_dailyMinutesByHour[hour] = dailySecondsByHour[hour] / 60;
 
         QVector<QPair<QString, int>> list;
         const auto appSeconds = dailyAppSecondsByHour.value(hour);
         for (auto it = appSeconds.cbegin(); it != appSeconds.cend(); ++it) {
-            list.append({it.key(), (it.value() + 59) / 60});
+            list.append({it.key(), it.value() / 60});
         }
         std::sort(list.begin(), list.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
         if (list.size() > 3) {
@@ -419,7 +430,7 @@ void MainWindow::updateWeeklySummary()
         dynamicMax = ((maxWeeklyMinutes + 29) / 30) * 30;
         tick = 30;
     } else if (maxWeeklyMinutes <= 360) {
-        dynamicMax = ((maxWeeklyMinutes + 59) / 60) * 60;
+        dynamicMax = (maxWeeklyMinutes / 60) * 60;
         tick = 60;
     } else if (maxWeeklyMinutes <= 720) {
         dynamicMax = ((maxWeeklyMinutes + 119) / 120) * 120;
