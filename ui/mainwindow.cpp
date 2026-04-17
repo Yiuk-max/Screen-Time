@@ -61,6 +61,7 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
         "  font-size: 18px;"
         "}"
         "QPushButton:hover { background-color: rgb(52,52,58); }"));
+    m_sidebarToggleButton->setToolTip(QStringLiteral("展开菜单"));
     sidebarLayout->addWidget(m_sidebarToggleButton, 0, Qt::AlignLeft | Qt::AlignTop);
 
     sidebarLayout->addStretch();
@@ -101,6 +102,7 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
     }
     m_settingsButton->setIcon(QIcon(gearPixmap));
     m_settingsButton->setIconSize(QSize(18, 18));
+    m_settingsButton->setToolTip(QStringLiteral("设置和帮助"));
     sidebarLayout->addWidget(m_settingsButton, 0, Qt::AlignLeft | Qt::AlignBottom);
 
     m_contentStack = new QStackedWidget(central);
@@ -121,7 +123,7 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
         applySidebarMode(!m_sidebarExpanded);
     });
 
-    applySidebarMode(true);
+    applySidebarMode(false);
     m_contentStack->setCurrentIndex(0);
     setupTrayIcon();
 }
@@ -430,7 +432,7 @@ void MainWindow::updateWeeklySummary()
         dynamicMax = ((maxWeeklyMinutes + 29) / 30) * 30;
         tick = 30;
     } else if (maxWeeklyMinutes <= 360) {
-        dynamicMax = (maxWeeklyMinutes / 60) * 60;
+        dynamicMax = ((maxWeeklyMinutes + 59) / 60) * 60;
         tick = 60;
     } else if (maxWeeklyMinutes <= 720) {
         dynamicMax = ((maxWeeklyMinutes + 119) / 120) * 120;
@@ -609,6 +611,8 @@ void MainWindow::applySidebarMode(bool expanded)
             "  background-color: rgb(42,42,46);"
             "}"));
         m_sidebarToggleButton->setText(QStringLiteral("☰"));
+        m_sidebarToggleButton->setToolTip(QString());
+        m_settingsButton->setToolTip(QString());
     } else {
         m_leftSidebar->setFixedWidth(68);
         m_settingsButton->setFixedSize(44, 44);
@@ -629,5 +633,7 @@ void MainWindow::applySidebarMode(bool expanded)
             "  background-color: rgb(42,42,46);"
             "}"));
         m_sidebarToggleButton->setText(QStringLiteral("≡"));
+        m_sidebarToggleButton->setToolTip(QStringLiteral("展开菜单"));
+        m_settingsButton->setToolTip(QStringLiteral("设置和帮助"));
     }    
 }

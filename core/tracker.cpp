@@ -76,44 +76,76 @@ void Tracker::flushToDatabase()
 QString Tracker::currentAppName() const
 {
     const QString fullPath = currentAppPath();
-    if (fullPath.isEmpty()) {
-        return QStringLiteral("UnknownApp");
+
+    // 能拿到路径就用路径
+    if (!fullPath.isEmpty()) {
+        const int slashPos = qMax(fullPath.lastIndexOf('/'), fullPath.lastIndexOf('\\'));
+        if (slashPos >= 0 && slashPos + 1 < fullPath.size()) {
+            return fullPath.mid(slashPos + 1);
+        }
+        return fullPath;
     }
-    const int slashPos = qMax(fullPath.lastIndexOf('/'), fullPath.lastIndexOf('\\'));
-    if (slashPos >= 0 && slashPos + 1 < fullPath.size()) {
-        return fullPath.mid(slashPos + 1);
+
+    // 拿不到路径，用窗口标题作为应用名
+#ifdef Q_OS_WIN
+    HWND hwnd = GetForegroundWindow();
+    if (!hwnd) return QStringLiteral("UnknownApp");
+
+    // 先试窗口类名（比标题更稳定）
+    wchar_t className[256] = {0};
+    if (GetClassNameW(hwnd, className, 256) > 0) {
+        QString name = QString::fromWCharArray(className);
+        // 过滤掉系统通用类名
+        if (name != "Shell_TrayWnd" && name != "Progman" && name != "WorkerW") {
+            return name;
+        }
     }
-    return fullPath;
+
+    // 最后用窗口标题
+    wchar_t titleBuffer[256] = {0};
+    if (GetWindowTextW(hwnd, titleBuffer, 256) > 0) {
+        return QString::fromWCharArray(titleBuffer);
+    }
+#endif
+    return QStringLiteral("UnknownApp");
 }
 
 QString Tracker::currentAppPath() const
 {
 #ifdef Q_OS_WIN
     HWND hwnd = GetForegroundWindow();
-    if (!hwnd) {
-        return QString();
-    }
+    if (!hwnd) return QString();
 
     DWORD processId = 0;
     GetWindowThreadProcessId(hwnd, &processId);
-    if (processId == 0) {
-        return QString();
+    if (processId == 0) return QString();
+
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (process) {
+        wchar_t pathBuffer[MAX_PATH] = {0};
+        DWORD size = MAX_PATH;
+        if (QueryFullProcessImageNameW(process, 0, pathBuffer, &size) && size > 0) {
+            CloseHandle(process);
+            return QString::fromWCharArray(pathBuffer);
+        }
+        CloseHandle(process);
+    }
+    process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+    if (process) {
+        wchar_t pathBuffer[MAX_PATH] = {0};
+        const DWORD size = GetModuleFileNameExW(process, nullptr, pathBuffer, MAX_PATH);
+        CloseHandle(process);
+        if (size > 0) {
+            return QString::fromWCharArray(pathBuffer);
+        }
     }
 
-    HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-    if (!process) {
-        return QString();
+    wchar_t titleBuffer[256] = {0};
+    if (GetWindowTextW(hwnd, titleBuffer, 256) > 0) {
+        return QString::fromWCharArray(titleBuffer);
     }
 
-    wchar_t pathBuffer[MAX_PATH] = {0};
-    const DWORD size = GetModuleFileNameExW(process, nullptr, pathBuffer, MAX_PATH);
-    CloseHandle(process);
-
-    if (size == 0) {
-        return QString();
-    }
-
-    return QString::fromWCharArray(pathBuffer);
+    return QString();
 #else
     return QString();
 #endif
