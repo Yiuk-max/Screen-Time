@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QMap>
 #include <QPushButton>
+#include <QSplitter>
 #include <QStackedWidget>
 #include <QSystemTrayIcon>
 #include <QMenu>
@@ -14,6 +15,7 @@ class HourlyChartWidget;
 class QListWidget;
 class QLabel;
 class QCheckBox;
+class QComboBox;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -23,6 +25,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override; // 拦截关闭事件
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void setupTrayIcon();                          // 初始化托盘
@@ -37,22 +40,25 @@ private:
     void updateWeeklySummary();
     bool isAutoStartEnabled() const;
     bool setAutoStartEnabled(bool enabled) const;
+    QString startupLaunchMode() const;
+    void setStartupLaunchMode(const QString &mode) const;
     void applySidebarMode(bool expanded);
+    void clampUsageSplitter();
     QIcon iconForApp(const QString &appName) const;
     QString formatDuration(int seconds) const;
 
     Database *m_database = nullptr;
     QWidget *m_leftSidebar = nullptr;
     QStackedWidget *m_contentStack = nullptr;
+    QSplitter *m_usageSplitter = nullptr;
     QListWidget *m_appStatsList = nullptr;
     QPushButton *m_dailyButton = nullptr;
     QPushButton *m_weeklyButton = nullptr;
     QPushButton *m_settingsButton = nullptr;
     QPushButton *m_sidebarToggleButton = nullptr;
-    QPushButton *m_refreshButton = nullptr;
     QCheckBox *m_autoStartSwitch = nullptr;
+    QComboBox *m_startupModeCombo = nullptr;
     QLabel *m_primaryStatLabel = nullptr;
-    QLabel *m_secondaryStatLabel = nullptr;
     HourlyChartWidget *m_hourlyChartWidget = nullptr;
     QTimer m_refreshTimer;
     QVector<QPair<QString, int>> m_dailyAppStats;
@@ -60,6 +66,8 @@ private:
     QVector<int> m_dailyMinutesByHour;
     QMap<int, QVector<QPair<QString, int>>> m_dailyTopAppsByHour;
     QVector<int> m_weeklyMinutesByDay;
+    QMap<int, QVector<QPair<QString, int>>> m_weeklyTopAppsByDay;
+    QMap<QString, QIcon> m_appIconByName;
     QMap<QString, QString> m_appPathByName;
     bool m_sidebarExpanded = true;
 

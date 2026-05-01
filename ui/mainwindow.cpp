@@ -10,6 +10,8 @@
 
 #include <QCoreApplication>
 #include <QCheckBox>
+#include <QComboBox>
+#include <QDesktopServices>
 #include <QDate>
 #include <QDateTime>
 #include <QDir>
@@ -22,11 +24,13 @@
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QFileInfo>
-#include <QLibraryInfo>
 #include <QSettings>
 #include <QSvgRenderer>
 #include <QStandardPaths>
 #include <QStyle>
+#include <QToolButton>
+#include <QUrl>
+#include <QToolTip>
 #include <algorithm>
 #include <numeric>
 #include <QPainter>
@@ -114,10 +118,14 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
 
     setCentralWidget(central);
     setWindowTitle(QStringLiteral("Screen Time"));
-    resize(900, 600);
+    resize(900, 660);
 
     connect(m_settingsButton, &QPushButton::toggled, this, [this](bool checked) {
-        m_contentStack->setCurrentIndex(checked ? 1 : 0);
+        if (checked) {
+            m_contentStack->setCurrentIndex(1);
+        } else {
+            m_contentStack->setCurrentIndex(0);
+        }
     });
     connect(m_sidebarToggleButton, &QPushButton::clicked, this, [this]() {
         applySidebarMode(!m_sidebarExpanded);
@@ -154,33 +162,59 @@ QWidget *MainWindow::createUsagePage()
     chartPanel->setFrameShape(QFrame::StyledPanel);
     chartPanel->setStyleSheet(QStringLiteral("QFrame { background-color: rgb(36,36,40); border-radius: 12px; }"));
     auto *chartLayout = new QVBoxLayout(chartPanel);
+    chartLayout->setContentsMargins(10, 10, 10, 10);
+    chartLayout->setSpacing(6);
     m_primaryStatLabel = new QLabel(chartPanel);
-    m_secondaryStatLabel = new QLabel(chartPanel);
     m_hourlyChartWidget = new HourlyChartWidget(chartPanel);
-    m_hourlyChartWidget->setMinimumHeight(320);
+    m_hourlyChartWidget->setMinimumHeight(250);
     chartLayout->addWidget(m_primaryStatLabel);
-    chartLayout->addWidget(m_secondaryStatLabel);
-    chartLayout->addWidget(m_hourlyChartWidget);
+    chartLayout->addWidget(m_hourlyChartWidget, 1);
 
-    auto *statsTitle = new QLabel(QStringLiteral("应用统计"), page);
-    m_appStatsList = new QListWidget(page);
-    m_refreshButton = new QPushButton(QStringLiteral("刷新"), page);
-    m_refreshButton->setFixedSize(90, 34);
+    auto *statsPanel = new QFrame(page);
+    statsPanel->setFrameShape(QFrame::NoFrame);
+    auto *statsLayout = new QVBoxLayout(statsPanel);
+    statsLayout->setContentsMargins(0, 0, 0, 0);
+    statsLayout->setSpacing(8);
+    auto *statsTitle = new QLabel(QStringLiteral("应用统计"), statsPanel);
+    m_appStatsList = new QListWidget(statsPanel);
+    statsLayout->addWidget(statsTitle);
+    statsLayout->addWidget(m_appStatsList, 1);
+
+    m_usageSplitter = new QSplitter(Qt::Vertical, page);
+    m_usageSplitter->setChildrenCollapsible(false);
+    m_usageSplitter->setHandleWidth(8);
+    m_usageSplitter->setStyleSheet(QStringLiteral(
+        "QSplitter::handle:vertical {"
+        "  background-color: rgb(58,58,64);"
+        "  margin: 2px 10px;"
+        "  border-radius: 3px;"
+        "}"
+        "QSplitter::handle:vertical:hover {"
+        "  background-color: rgb(88,88,96);"
+        "}"));
+    m_usageSplitter->addWidget(chartPanel);
+    m_usageSplitter->addWidget(statsPanel);
+    m_usageSplitter->setStretchFactor(0, 3);
+    m_usageSplitter->setStretchFactor(1, 2);
+    m_usageSplitter->setSizes({380, 240});
+
+    chartPanel->setMinimumHeight(220);
+    statsPanel->setMinimumHeight(170);
+
+    if (QSplitterHandle *handle = m_usageSplitter->handle(1)) {
+        handle->installEventFilter(this);
+        handle->setCursor(Qt::SizeVerCursor);
+        handle->setToolTip(QStringLiteral("拖动调整柱状图和应用统计区域大小"));
+    }
+    connect(m_usageSplitter, &QSplitter::splitterMoved, this, [this](int, int) {
+        clampUsageSplitter();
+    });
 
     layout->addLayout(switchRow);
-    layout->addWidget(chartPanel);
-    layout->addWidget(statsTitle);
-    layout->addWidget(m_appStatsList, 1);
-    auto *bottomRow = new QHBoxLayout();
-    bottomRow->addStretch();
-    bottomRow->addWidget(m_refreshButton);
-    layout->addLayout(bottomRow);
+    layout->addWidget(m_usageSplitter, 1);
 
     connect(m_dailyButton, &QPushButton::clicked, this, &MainWindow::fillAppStatsForDaily);
     connect(m_weeklyButton, &QPushButton::clicked, this, &MainWindow::fillAppStatsForWeekly);
-    connect(m_refreshButton, &QPushButton::clicked, this, [this]() {
-        refreshUsageData();
-    });
 
     m_refreshTimer.setInterval(5000);
     connect(&m_refreshTimer, &QTimer::timeout, this, &MainWindow::refreshUsageData);
@@ -256,6 +290,93 @@ QWidget *MainWindow::createSettingsPage()
 
     layout->addWidget(title);
     layout->addWidget(autoStartRow);
+
+    auto *startupModeRow = new QFrame(page);
+    startupModeRow->setStyleSheet(QStringLiteral(
+        "QFrame { background-color: rgb(36,36,40); border-radius: 10px; }"
+        "QLabel { color: rgb(235,235,240); font-size: 14px; }"
+        "QComboBox {"
+        "  color: rgb(235,235,240); background-color: rgb(50,50,55);"
+        "  border: 1px solid rgb(78,78,84); border-radius: 6px; padding: 4px 8px;"
+        "}"
+        "QComboBox QAbstractItemView {"
+        "  background-color: rgb(40,40,44); color: rgb(235,235,240);"
+        "  border: 1px solid rgb(78,78,84);"
+        "}"));
+    auto *modeLayout = new QHBoxLayout(startupModeRow);
+    modeLayout->setContentsMargins(14, 12, 14, 12);
+    modeLayout->setSpacing(12);
+
+    auto *modeLabel = new QLabel(QStringLiteral("开机启动方式"), startupModeRow);
+    m_startupModeCombo = new QComboBox(startupModeRow);
+    m_startupModeCombo->addItem(QStringLiteral("系统托盘启动"), QStringLiteral("tray"));
+    m_startupModeCombo->addItem(QStringLiteral("弹出主界面"), QStringLiteral("window"));
+
+    const QString mode = startupLaunchMode();
+    const int modeIndex = qMax(0, m_startupModeCombo->findData(mode));
+    m_startupModeCombo->setCurrentIndex(modeIndex);
+    connect(m_startupModeCombo, &QComboBox::currentIndexChanged, this, [this]() {
+        if (!m_startupModeCombo) {
+            return;
+        }
+        setStartupLaunchMode(m_startupModeCombo->currentData().toString());
+    });
+
+    modeLayout->addWidget(modeLabel);
+    modeLayout->addStretch();
+    modeLayout->addWidget(m_startupModeCombo);
+
+    layout->addWidget(startupModeRow);
+
+    auto *githubRow = new QFrame(page);
+    githubRow->setStyleSheet(QStringLiteral(
+        "QFrame { background-color: rgb(36,36,40); border-radius: 10px; }"
+        "QLabel { color: rgb(235,235,240); font-size: 14px; }"
+        "QPushButton {"
+        "  color: rgb(157,199,255); background: transparent; border: none;"
+        "  text-align: left; padding: 0;"
+        "}"
+        "QPushButton:hover { color: rgb(187,217,255); }"));
+    auto *githubLayout = new QHBoxLayout(githubRow);
+    githubLayout->setContentsMargins(14, 12, 14, 12);
+    githubLayout->setSpacing(10);
+
+    auto *githubLabel = new QLabel(QStringLiteral("项目地址"), githubRow);
+    auto *githubButton = new QPushButton(QStringLiteral("Yiuk-max/Screen-Time"), githubRow);
+    githubButton->setCursor(Qt::PointingHandCursor);
+    connect(githubButton, &QPushButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Yiuk-max/Screen-Time")));
+    });
+
+    const QByteArray shareSvg = R"SVG(
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="#B8C8E8" d="M14 3a1 1 0 1 0 0 2h3.59l-7.3 7.3a1 1 0 1 0 1.42 1.4L19 6.41V10a1 1 0 1 0 2 0V4a1 1 0 0 0-1-1h-6Z"/>
+  <path fill="#B8C8E8" d="M6 5a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-5a1 1 0 1 0-2 0v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5a1 1 0 1 0 0-2H6Z"/>
+</svg>
+)SVG";
+    QSvgRenderer shareRenderer(shareSvg);
+    QPixmap sharePix(16, 16);
+    sharePix.fill(Qt::transparent);
+    {
+        QPainter painter(&sharePix);
+        shareRenderer.render(&painter);
+    }
+    auto *shareButton = new QToolButton(githubRow);
+    shareButton->setIcon(QIcon(sharePix));
+    shareButton->setIconSize(QSize(18, 18));
+    shareButton->setAutoRaise(true);
+    shareButton->setToolTip(QStringLiteral("打开项目链接"));
+    shareButton->setCursor(Qt::PointingHandCursor);
+    connect(shareButton, &QToolButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Yiuk-max/Screen-Time")));
+    });
+
+    githubLayout->addWidget(githubLabel);
+    githubLayout->addSpacing(8);
+    githubLayout->addWidget(githubButton, 1);
+    githubLayout->addWidget(shareButton, 0, Qt::AlignRight);
+
+    layout->addWidget(githubRow);
     layout->addStretch();
     return page;
 }
@@ -306,8 +427,12 @@ void MainWindow::refreshUsageData()
     m_dailyMinutesByHour = QVector<int>(24, 0);
     m_dailyTopAppsByHour.clear();
     m_weeklyMinutesByDay = QVector<int>(7, 0);
+    m_weeklyTopAppsByDay.clear();
+    m_appIconByName.clear();
     QVector<int> dailySecondsByHour(24, 0);
     QMap<int, QHash<QString, int>> dailyAppSecondsByHour;
+    QVector<QHash<QString, int>> weeklyAppSecondsByDay(7);
+    QVector<int> weeklySecondsByDay(7, 0);
 
     const QDate today = QDate::currentDate();
     const QDate weekStart = today.addDays(-6);
@@ -327,7 +452,6 @@ void MainWindow::refreshUsageData()
             dailyAppSecondsByHour[hour][record.appName] += record.durationSeconds;
         }
     }
-    QVector<QHash<int, int>> dailyHourSeconds(7);
     for (const UsageRecord &record : weeklyRecords) {
         weeklyAppSeconds[record.appName] += record.durationSeconds;
         if (!record.appPath.isEmpty() && !m_appPathByName.contains(record.appName)) {
@@ -338,20 +462,23 @@ void MainWindow::refreshUsageData()
         const int index = weekStart.daysTo(date);
         if (index < 0 || index >= 7) continue;
 
-        const QDateTime tracked = QDateTime::fromString(record.trackedAt, "yyyy-MM-dd HH:mm:ss");
-        if (!tracked.isValid()) continue;
-        const int hour = tracked.time().hour();
-
-        int &slot = dailyHourSeconds[index][hour];
-        slot += record.durationSeconds;
+        weeklySecondsByDay[index] += record.durationSeconds;
+        weeklyAppSecondsByDay[index][record.appName] += record.durationSeconds;
     }
 
     for (int i = 0; i < 7; ++i) {
-        int total = 0;
-        for (auto secs : dailyHourSeconds[i]) {
-            total += secs / 60;
+        m_weeklyMinutesByDay[i] = (weeklySecondsByDay[i] + 59) / 60;
+        QVector<QPair<QString, int>> topApps;
+        for (auto it = weeklyAppSecondsByDay[i].cbegin(); it != weeklyAppSecondsByDay[i].cend(); ++it) {
+            topApps.append({it.key(), (it.value() + 59) / 60});
         }
-        m_weeklyMinutesByDay[i] = total;
+        std::sort(topApps.begin(), topApps.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
+        if (topApps.size() > 3) {
+            topApps.resize(3);
+        }
+        if (!topApps.isEmpty()) {
+            m_weeklyTopAppsByDay[i] = topApps;
+        }
     }
 
     for (int hour = 0; hour < dailySecondsByHour.size(); ++hour) {
@@ -381,6 +508,15 @@ void MainWindow::refreshUsageData()
         m_weeklyAppStats.append({it.key(), it.value()});
     }
 
+    for (auto it = dailyAppSeconds.cbegin(); it != dailyAppSeconds.cend(); ++it) {
+        m_appIconByName[it.key()] = iconForApp(it.key());
+    }
+    for (auto it = weeklyAppSeconds.cbegin(); it != weeklyAppSeconds.cend(); ++it) {
+        if (!m_appIconByName.contains(it.key())) {
+            m_appIconByName[it.key()] = iconForApp(it.key());
+        }
+    }
+
     if (m_dailyButton && m_dailyButton->isChecked()) {
         fillAppStatsForDaily();
     } else {
@@ -390,30 +526,30 @@ void MainWindow::refreshUsageData()
 
 void MainWindow::updateDailyChartAndSummary()
 {
-    if (!m_hourlyChartWidget || !m_primaryStatLabel || !m_secondaryStatLabel) {
+    if (!m_hourlyChartWidget || !m_primaryStatLabel) {
         return;
     }
 
     const int totalMinutes = std::accumulate(m_dailyMinutesByHour.cbegin(), m_dailyMinutesByHour.cend(), 0);
     m_primaryStatLabel->setText(QStringLiteral("今日总时长 %1").arg(formatDuration(totalMinutes * 60)));
-    m_secondaryStatLabel->setText(QStringLiteral("使用时长（截至当前）"));
     QStringList hourLabels;
     for (int i = 0; i < 24; ++i) {
         hourLabels.append(QStringLiteral("%1时").arg(i));
     }
-    m_hourlyChartWidget->setChartData(m_dailyMinutesByHour, hourLabels, m_dailyTopAppsByHour, true, 60, 30);
+    m_hourlyChartWidget->setChartData(m_dailyMinutesByHour, hourLabels, m_dailyTopAppsByHour, m_appIconByName, true, 60, 30);
 }
 
 void MainWindow::updateWeeklySummary()
 {
-    if (!m_hourlyChartWidget || !m_primaryStatLabel || !m_secondaryStatLabel) {
+    if (!m_hourlyChartWidget || !m_primaryStatLabel) {
         return;
     }
 
     const int totalMinutes = std::accumulate(m_weeklyMinutesByDay.cbegin(), m_weeklyMinutesByDay.cend(), 0);
     const int avgMinutes = m_weeklyMinutesByDay.isEmpty() ? 0 : totalMinutes / m_weeklyMinutesByDay.size();
-    m_primaryStatLabel->setText(QStringLiteral("近7天日均 %1").arg(formatDuration(avgMinutes * 60)));
-    m_secondaryStatLabel->setText(QStringLiteral("近7天总时长 %1").arg(formatDuration(totalMinutes * 60)));
+    m_primaryStatLabel->setText(
+        QStringLiteral("近7天总时长 %1        日均时长 %2")
+            .arg(formatDuration(totalMinutes * 60), formatDuration(avgMinutes * 60)));
 
     QStringList dayLabels;
     const QDate start = QDate::currentDate().addDays(-6);
@@ -442,7 +578,7 @@ void MainWindow::updateWeeklySummary()
         tick = 180;
     }
 
-    m_hourlyChartWidget->setChartData(m_weeklyMinutesByDay, dayLabels, {}, false, dynamicMax, tick);
+    m_hourlyChartWidget->setChartData(m_weeklyMinutesByDay, dayLabels, m_weeklyTopAppsByDay, m_appIconByName, false, dynamicMax, tick);
 }
 
 QString MainWindow::formatDuration(int seconds) const
@@ -489,12 +625,7 @@ bool MainWindow::setAutoStartEnabled(bool enabled) const
     const QString key = QStringLiteral("ScreenTime");
     if (enabled) {
         const QString appPath = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
-        const QString qtBinPath =
-            QDir::toNativeSeparators(QLibraryInfo::path(QLibraryInfo::BinariesPath));
-        const QString command = QStringLiteral(
-                                    "cmd /C \"set \"PATH=%1;%%PATH%%\" && \"%2\"\"")
-                                    .arg(qtBinPath, appPath);
-        runKey.setValue(key, command);
+        runKey.setValue(key, QStringLiteral("\"%1\" --autostart").arg(appPath));
     } else {
         runKey.remove(key);
     }
@@ -504,6 +635,18 @@ bool MainWindow::setAutoStartEnabled(bool enabled) const
     Q_UNUSED(enabled);
     return false;
 #endif
+}
+
+QString MainWindow::startupLaunchMode() const
+{
+    QSettings settings(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    return settings.value(QStringLiteral("startup/launch_mode"), QStringLiteral("tray")).toString();
+}
+
+void MainWindow::setStartupLaunchMode(const QString &mode) const
+{
+    QSettings settings(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    settings.setValue(QStringLiteral("startup/launch_mode"), mode);
 }
 void MainWindow::setupTrayIcon()
 {
@@ -593,7 +736,7 @@ void MainWindow::applySidebarMode(bool expanded)
         m_leftSidebar->setFixedWidth(190);
         m_settingsButton->setFixedSize(176, 48);
         m_settingsButton->setText(QStringLiteral("  设置和帮助"));
-        m_settingsButton->setStyleSheet(QStringLiteral(
+        const QString expandedStyle = QStringLiteral(
             "QPushButton {"
             "  color: rgb(220,220,225);"
             "  background-color: rgb(34,34,38);"
@@ -609,7 +752,8 @@ void MainWindow::applySidebarMode(bool expanded)
             "}"
             "QPushButton:hover {"
             "  background-color: rgb(42,42,46);"
-            "}"));
+            "}");
+        m_settingsButton->setStyleSheet(expandedStyle);
         m_sidebarToggleButton->setText(QStringLiteral("☰"));
         m_sidebarToggleButton->setToolTip(QString());
         m_settingsButton->setToolTip(QString());
@@ -617,7 +761,7 @@ void MainWindow::applySidebarMode(bool expanded)
         m_leftSidebar->setFixedWidth(68);
         m_settingsButton->setFixedSize(44, 44);
         m_settingsButton->setText(QString());
-        m_settingsButton->setStyleSheet(QStringLiteral(
+        const QString collapsedStyle = QStringLiteral(
             "QPushButton {"
             "  color: rgb(220,220,225);"
             "  background-color: rgb(34,34,38);"
@@ -631,9 +775,50 @@ void MainWindow::applySidebarMode(bool expanded)
             "}"
             "QPushButton:hover {"
             "  background-color: rgb(42,42,46);"
-            "}"));
+            "}");
+        m_settingsButton->setStyleSheet(collapsedStyle);
         m_sidebarToggleButton->setText(QStringLiteral("≡"));
         m_sidebarToggleButton->setToolTip(QStringLiteral("展开菜单"));
         m_settingsButton->setToolTip(QStringLiteral("设置和帮助"));
     }    
+}
+
+void MainWindow::clampUsageSplitter()
+{
+    if (!m_usageSplitter || m_usageSplitter->count() < 2) {
+        return;
+    }
+
+    QList<int> sizes = m_usageSplitter->sizes();
+    if (sizes.size() < 2) {
+        return;
+    }
+
+    const int total = sizes[0] + sizes[1];
+    const int minTop = 220;
+    const int minBottom = 170;
+    const int maxTop = qMax(minTop, total - minBottom);
+    const int clampedTop = qBound(minTop, sizes[0], maxTop);
+    const int clampedBottom = total - clampedTop;
+
+    if (clampedTop != sizes[0]) {
+        m_usageSplitter->setSizes({clampedTop, clampedBottom});
+    }
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (m_usageSplitter && watched == m_usageSplitter->handle(1)) {
+        if (event->type() == QEvent::Enter) {
+            if (auto *handle = qobject_cast<QWidget *>(watched)) {
+                handle->setCursor(Qt::SizeVerCursor);
+                QToolTip::showText(handle->mapToGlobal(QPoint(handle->width() / 2, 0)),
+                                   QStringLiteral("拖动调整柱状图和应用统计区域大小"),
+                                   handle);
+            }
+        } else if (event->type() == QEvent::Leave) {
+            QToolTip::hideText();
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }

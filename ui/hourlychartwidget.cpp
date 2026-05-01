@@ -5,6 +5,13 @@
 #include <QPainter>
 #include <QPainterPath>
 
+static QString formatDurationFromMinutes(int minutes)
+{
+    const int hours = minutes / 60;
+    const int mins = minutes % 60;
+    return QStringLiteral("%1小时%2分钟").arg(hours).arg(mins);
+}
+
 HourlyChartWidget::HourlyChartWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -15,12 +22,13 @@ HourlyChartWidget::HourlyChartWidget(QWidget *parent)
 void HourlyChartWidget::setDailyData(const QVector<int> &minutesByHour,
                                      const QMap<int, QVector<QPair<QString, int>>> &topAppsByHour)
 {
-    setChartData(minutesByHour, {}, topAppsByHour, true);
+    setChartData(minutesByHour, {}, topAppsByHour, {}, true);
 }
 
 void HourlyChartWidget::setChartData(const QVector<int> &minutesByBucket,
                                      const QStringList &bucketLabels,
                                      const QMap<int, QVector<QPair<QString, int>>> &topAppsByBucket,
+                                     const QMap<QString, QIcon> &appIconsByName,
                                      bool hourRangeTooltip,
                                      int fixedMaxMinutes,
                                      int tickIntervalMinutes)
@@ -28,6 +36,7 @@ void HourlyChartWidget::setChartData(const QVector<int> &minutesByBucket,
     m_minutesByBucket = minutesByBucket;
     m_bucketLabels = bucketLabels;
     m_topAppsByBucket = topAppsByBucket;
+    m_appIconsByName = appIconsByName;
     m_hourRangeTooltip = hourRangeTooltip;
     m_fixedMaxMinutes = fixedMaxMinutes;
     m_tickIntervalMinutes = qMax(1, tickIntervalMinutes);
@@ -122,27 +131,39 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
         p.drawLine(x1, area.top(), x1, area.bottom());
 
         const int minutes = (m_hoverBucket < m_minutesByBucket.size()) ? m_minutesByBucket[m_hoverBucket] : 0;
-        QString title;
-        if (m_hourRangeTooltip) {
-            title = QStringLiteral("%1 时 - %2 时").arg(m_hoverBucket).arg(m_hoverBucket + 1);
-        } else {
-            title = (m_hoverBucket < m_bucketLabels.size()) ? m_bucketLabels[m_hoverBucket]
-                                                            : QString::number(m_hoverBucket);
-        }
-        QString tipText = QStringLiteral("%1 分钟\n%2").arg(minutes).arg(title);
-
         const auto topApps = m_topAppsByBucket.value(m_hoverBucket);
-        for (int i = 0; i < topApps.size() && i < 3; ++i) {
-            tipText += QStringLiteral("\n%1  %2 分钟").arg(topApps[i].first).arg(topApps[i].second);
-        }
-
-        QRect tipRect(area.left() + area.width() / 2 - 150, area.top() + 8, 300, 120);
+        const int shownTop = qMin(3, topApps.size());
+        const int tipHeight = 52 + shownTop * 24;
+        QRect tipRect(area.left() + area.width() / 2 - 170, area.top() + 8, 340, tipHeight);
         p.setPen(Qt::NoPen);
         p.setBrush(QColor(56, 56, 60, 230));
         p.drawRoundedRect(tipRect, 12, 12);
 
         p.setPen(QColor(235, 235, 240));
-        p.drawText(tipRect.adjusted(14, 12, -14, -12), Qt::AlignLeft | Qt::AlignTop, tipText);
+        QString summary = QStringLiteral("总时长 %1").arg(formatDurationFromMinutes(minutes));
+        if (m_hourRangeTooltip) {
+            summary += QStringLiteral("  (%1时-%2时)").arg(m_hoverBucket).arg(m_hoverBucket + 1);
+        }
+        p.drawText(tipRect.adjusted(12, 10, -12, -10), Qt::AlignLeft | Qt::AlignTop, summary);
+
+        int y = tipRect.top() + 34;
+        for (int i = 0; i < shownTop; ++i) {
+            const QString &appName = topApps[i].first;
+            const int appMinutes = topApps[i].second;
+            const QRect iconRect(tipRect.left() + 12, y, 16, 16);
+            const QIcon icon = m_appIconsByName.value(appName);
+            if (!icon.isNull()) {
+                icon.paint(&p, iconRect);
+            } else {
+                p.setBrush(QColor(120, 120, 126));
+                p.setPen(Qt::NoPen);
+                p.drawRoundedRect(iconRect, 3, 3);
+                p.setPen(QColor(235, 235, 240));
+            }
+            p.drawText(tipRect.left() + 34, y + 13,
+                       QStringLiteral("%1  %2").arg(appName, formatDurationFromMinutes(appMinutes)));
+            y += 24;
+        }
     }
 }
 

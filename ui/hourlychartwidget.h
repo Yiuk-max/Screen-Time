@@ -2,6 +2,7 @@
 #define HOURLYCHARTWIDGET_H
 
 #include <QMap>
+#include <QIcon>
 #include <QPair>
 #include <QStringList>
 #include <QVector>
@@ -19,6 +20,7 @@ public:
     void setChartData(const QVector<int> &minutesByBucket,
                       const QStringList &bucketLabels,
                       const QMap<int, QVector<QPair<QString, int>>> &topAppsByBucket,
+                      const QMap<QString, QIcon> &appIconsByName,
                       bool hourRangeTooltip,
                       int fixedMaxMinutes = -1,
                       int tickIntervalMinutes = 30);
@@ -35,6 +37,7 @@ private:
     QVector<int> m_minutesByBucket;
     QStringList m_bucketLabels;
     QMap<int, QVector<QPair<QString, int>>> m_topAppsByBucket;
+    QMap<QString, QIcon> m_appIconsByName;
     int m_hoverBucket = -1;
     bool m_hourRangeTooltip = false;
     int m_fixedMaxMinutes = -1;
