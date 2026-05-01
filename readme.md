@@ -7,7 +7,6 @@
 ## 效果演示
 
 ![主界面](./screenshots/mainwindow.png)
-
 ![设置](./screenshots/setting.png)
 
 ## 功能
@@ -29,8 +28,11 @@
 ## 运行要求
 
 |系统|Windows 10 及以上|
+
 |CPU|能转就行|
+
 |内存|20MB及以上|
+
 |存储|100MB及以上|
 
 >第一次写readme，写的不好请见谅
