@@ -10,12 +10,20 @@
 #include <QMenu>
 #include <QTimer>
 #include <QVector>
+#include <QTextEdit>
+#include "apptheme.h"
 class Database;
 class HourlyChartWidget;
 class QListWidget;
 class QLabel;
 class QCheckBox;
 class QComboBox;
+class Updater;
+class QLineEdit;
+class QPushButton;
+class QScrollArea;
+class QFrame;
+class AIReportPage;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -44,9 +52,22 @@ private:
     void setStartupLaunchMode(const QString &mode) const;
     void applySidebarMode(bool expanded);
     void clampUsageSplitter();
+    void applyTheme(AppThemeKind kind);
+    void applyCurrentTheme();
+    void syncAIReportSettings();
     QIcon iconForApp(const QString &appName) const;
     QString formatDuration(int seconds) const;
 
+private slots:
+    void onUpdateAvailable(const QString &latestVersion, const QString &downloadUrl, const QString &releaseNotes);
+    void onNoUpdateAvailable();
+    void onUpdateCheckFailed(const QString &error);
+    void onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
+    void onDownloadFinished(const QString &filePath);
+    void onDownloadFailed(const QString &error);
+    void onInstallUpdateRequested(const QString &zipFilePath);
+
+private:
     Database *m_database = nullptr;
     QWidget *m_leftSidebar = nullptr;
     QStackedWidget *m_contentStack = nullptr;
@@ -54,6 +75,8 @@ private:
     QListWidget *m_appStatsList = nullptr;
     QPushButton *m_dailyButton = nullptr;
     QPushButton *m_weeklyButton = nullptr;
+    QPushButton *m_homeButton = nullptr;
+    QPushButton *m_aiReportButton = nullptr;
     QPushButton *m_settingsButton = nullptr;
     QPushButton *m_sidebarToggleButton = nullptr;
     QCheckBox *m_autoStartSwitch = nullptr;
@@ -70,8 +93,32 @@ private:
     QMap<QString, QIcon> m_appIconByName;
     QMap<QString, QString> m_appPathByName;
     bool m_sidebarExpanded = true;
+    AppThemeColors m_theme = appThemeColors(AppThemeKind::Dark);
+
+    QFrame *m_chartPanel = nullptr;
+    QLabel *m_statsTitleLabel = nullptr;
+    QScrollArea *m_settingsScrollArea = nullptr;
+    QWidget *m_settingsContent = nullptr;
+    QComboBox *m_themeCombo = nullptr;
 
     QSystemTrayIcon *m_trayIcon = nullptr;  // 托盘图标
     QMenu *m_trayMenu = nullptr;            // 托盘右键菜单
+
+    // 自动更新
+    Updater *m_updater = nullptr;
+
+    // AI 周报
+    AIReportPage *m_aiReportPage = nullptr;
+    QLabel *m_versionLabel = nullptr;
+    QPushButton *m_checkUpdateButton = nullptr;
+    QCheckBox *m_autoCheckUpdateSwitch = nullptr;
+    QTextEdit *m_releaseNotesEdit = nullptr;
+    QString m_pendingUpdateUrl;
+
+    // AI 周报配置（设置页面独立栏目）
+    QCheckBox *m_aiReportEnabledSwitch = nullptr;
+    QCheckBox *m_aiAutoWeeklySwitch = nullptr;
+    QCheckBox *m_aiAutoDailySwitch = nullptr;
+    QLineEdit *m_deepseekApiKeyEdit = nullptr;
 };
 #endif // MAINWINDOW_H

@@ -7,6 +7,8 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    app.setOrganizationName(QStringLiteral("ScreenTime"));
+    app.setApplicationName(QStringLiteral("ScreenTime"));
     app.setQuitOnLastWindowClosed(false); // 关键：关闭窗口不退出程序
 
     Database database;

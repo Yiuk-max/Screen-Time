@@ -8,7 +8,7 @@
 
 ![主界面](./screenshots/mainwindow.png)
 ![设置](./screenshots/setting.png)
-
+![AI周报](./screenshots/report.png)
 ## 功能
 
 1.【功能】支持查看当天和近七天两种使用状况

@@ -32,9 +32,11 @@ public:
 
     QList<UsageRecord> queryToday() const;
     QList<UsageRecord> queryWeekly() const;
+    QList<UsageRecord> queryPreviousWeek() const;
 
 private:
     bool ensureTable();
+    QList<UsageRecord> querySinceDate(const QString &startDate) const;
     QSqlDatabase m_db;
 };
 
