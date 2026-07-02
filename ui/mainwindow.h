@@ -10,7 +10,6 @@
 #include <QMenu>
 #include <QTimer>
 #include <QVector>
-#include <QTextEdit>
 #include "apptheme.h"
 class Database;
 class HourlyChartWidget;
@@ -18,7 +17,6 @@ class QListWidget;
 class QLabel;
 class QCheckBox;
 class QComboBox;
-class Updater;
 class QLineEdit;
 class QPushButton;
 class QScrollArea;
@@ -58,15 +56,6 @@ private:
     QIcon iconForApp(const QString &appName) const;
     QString formatDuration(int seconds) const;
 
-private slots:
-    void onUpdateAvailable(const QString &latestVersion, const QString &downloadUrl, const QString &releaseNotes);
-    void onNoUpdateAvailable();
-    void onUpdateCheckFailed(const QString &error);
-    void onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
-    void onDownloadFinished(const QString &filePath);
-    void onDownloadFailed(const QString &error);
-    void onInstallUpdateRequested(const QString &zipFilePath);
-
 private:
     Database *m_database = nullptr;
     QWidget *m_leftSidebar = nullptr;
@@ -104,21 +93,11 @@ private:
     QSystemTrayIcon *m_trayIcon = nullptr;  // 托盘图标
     QMenu *m_trayMenu = nullptr;            // 托盘右键菜单
 
-    // 自动更新
-    Updater *m_updater = nullptr;
-
-    // AI 周报
     AIReportPage *m_aiReportPage = nullptr;
     QLabel *m_versionLabel = nullptr;
-    QPushButton *m_checkUpdateButton = nullptr;
-    QCheckBox *m_autoCheckUpdateSwitch = nullptr;
-    QTextEdit *m_releaseNotesEdit = nullptr;
-    QString m_pendingUpdateUrl;
 
     // AI 周报配置（设置页面独立栏目）
     QCheckBox *m_aiReportEnabledSwitch = nullptr;
-    QCheckBox *m_aiAutoWeeklySwitch = nullptr;
-    QCheckBox *m_aiAutoDailySwitch = nullptr;
     QLineEdit *m_deepseekApiKeyEdit = nullptr;
 };
 #endif // MAINWINDOW_H

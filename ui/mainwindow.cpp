@@ -1,16 +1,15 @@
 #include "mainwindow.h"
 #include "core/database.h"
 #include "hourlychartwidget.h"
-#include "core/updater.h"
 #include "aireportpage.h"
 #include "apptheme.h"
 #include <QApplication>
-#include <QProcess>
 #include <QCloseEvent>
 #include <QSystemTrayIcon>
 #include <QMenu>
 #include <QAction>
 #include <QButtonGroup>
+#include <QMessageBox>
 
 #include <QCoreApplication>
 #include <QCheckBox>
@@ -43,6 +42,10 @@
 #include <QLineEdit>
 #include <QWidget>
 #include <QScrollArea>
+
+#ifndef SCREENTIME_VERSION
+#define SCREENTIME_VERSION "0.1.0"
+#endif
 
 MainWindow::MainWindow(Database *database, QWidget *parent)
     : QMainWindow(parent)
@@ -226,9 +229,6 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
     m_aiReportPage = new AIReportPage(m_database, central);
     m_contentStack->addWidget(m_aiReportPage);
     syncAIReportSettings();
-    if (m_aiReportPage) {
-        m_aiReportPage->checkAndAutoGenerate();
-    }
     applyCurrentTheme();
 
     layout->addWidget(m_leftSidebar);
@@ -254,19 +254,6 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
     applySidebarMode(false);
     m_contentStack->setCurrentIndex(0);
     setupTrayIcon();
-
-    // 初始化自动更新器
-    m_updater = new Updater(this);
-    connect(m_updater, &Updater::updateAvailable, this, &MainWindow::onUpdateAvailable);
-    connect(m_updater, &Updater::noUpdateAvailable, this, &MainWindow::onNoUpdateAvailable);
-    connect(m_updater, &Updater::updateCheckFailed, this, &MainWindow::onUpdateCheckFailed);
-    connect(m_updater, &Updater::downloadProgress, this, &MainWindow::onDownloadProgress);
-    connect(m_updater, &Updater::downloadFinished, this, &MainWindow::onDownloadFinished);
-    connect(m_updater, &Updater::downloadFailed, this, &MainWindow::onDownloadFailed);
-    connect(m_updater, &Updater::installUpdateRequested, this, &MainWindow::onInstallUpdateRequested);
-
-    // 启动时静默检查更新
-    m_updater->checkForUpdates(true);
 }
 
 QWidget *MainWindow::createUsagePage()
@@ -628,48 +615,6 @@ QWidget *MainWindow::createSettingsPage()
 
     layout->addWidget(apiKeyRow);
 
-    auto makeToggleRow = [&](const QString &labelText, QCheckBox **switchOut) {
-        auto *row = new QFrame(content);
-        row->setObjectName(QStringLiteral("settingsCard"));
-        auto *rowLayout = new QHBoxLayout(row);
-        rowLayout->setContentsMargins(14, 12, 14, 12);
-        rowLayout->setSpacing(12);
-
-        auto *label = new QLabel(labelText, row);
-        *switchOut = new QCheckBox(row);
-        (*switchOut)->setCursor(Qt::PointingHandCursor);
-        (*switchOut)->setStyleSheet(toggleSwitchStyle);
-
-        auto *thumb = new QLabel(*switchOut);
-        thumb->setFixedSize(18, 18);
-        thumb->setStyleSheet(QStringLiteral("background-color: white; border-radius: 9px;"));
-        thumb->move(3, 3);
-        connect(*switchOut, &QCheckBox::toggled, thumb, [thumb](bool checked) {
-            thumb->move(checked ? 23 : 3, 3);
-        });
-
-        rowLayout->addWidget(label);
-        rowLayout->addStretch();
-        rowLayout->addWidget(*switchOut);
-        layout->addWidget(row);
-    };
-
-    makeToggleRow(QStringLiteral("每周自动生成周报"), &m_aiAutoWeeklySwitch);
-    makeToggleRow(QStringLiteral("每天自动生成日报"), &m_aiAutoDailySwitch);
-
-    QSettings aiAutoSettings(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
-    m_aiAutoWeeklySwitch->setChecked(aiAutoSettings.value(QStringLiteral("ai/auto_weekly"), false).toBool());
-    m_aiAutoDailySwitch->setChecked(aiAutoSettings.value(QStringLiteral("ai/auto_daily"), false).toBool());
-
-    connect(m_aiAutoWeeklySwitch, &QCheckBox::toggled, this, [](bool checked) {
-        QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
-        s.setValue(QStringLiteral("ai/auto_weekly"), checked);
-    });
-    connect(m_aiAutoDailySwitch, &QCheckBox::toggled, this, [](bool checked) {
-        QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
-        s.setValue(QStringLiteral("ai/auto_daily"), checked);
-    });
-
     // 连接启用开关
     connect(m_aiReportEnabledSwitch, &QCheckBox::toggled, this, [this](bool checked) {
         QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
@@ -682,12 +627,11 @@ QWidget *MainWindow::createSettingsPage()
     const bool aiEnabled = aiToggledSettings.value(QStringLiteral("ai/enabled"), false).toBool();
     m_aiReportEnabledSwitch->setChecked(aiEnabled);
 
-    // ========== 自动更新区域 ==========
-    auto *updateTitle = new QLabel(QStringLiteral("自动更新"), content);
-    updateTitle->setObjectName(QStringLiteral("settingsSectionTitle"));
-    updateTitle->setStyleSheet(QStringLiteral("font-size: 16px; font-weight: 600; margin-top: 12px;"));
+    // ========== 关于 ==========
+    auto *aboutTitle = new QLabel(QStringLiteral("帮助"), content);
+    aboutTitle->setObjectName(QStringLiteral("settingsSectionTitle"));
+    aboutTitle->setStyleSheet(QStringLiteral("font-size: 16px; font-weight: 600; margin-top: 12px;"));
 
-    // 版本信息行
     auto *versionRow = new QFrame(content);
     versionRow->setObjectName(QStringLiteral("settingsCard"));
     auto *versionLayout = new QHBoxLayout(versionRow);
@@ -695,82 +639,46 @@ QWidget *MainWindow::createSettingsPage()
     versionLayout->setSpacing(12);
 
     auto *versionLabel = new QLabel(QStringLiteral("当前版本"), versionRow);
-    m_versionLabel = new QLabel(m_updater ? m_updater->currentVersion() : QStringLiteral("0.1.0"), versionRow);
-    m_versionLabel->setStyleSheet(QStringLiteral("color: rgb(150,150,155);"));
+    m_versionLabel = new QLabel(QStringLiteral(SCREENTIME_VERSION), versionRow);
 
     versionLayout->addWidget(versionLabel);
     versionLayout->addStretch();
     versionLayout->addWidget(m_versionLabel);
 
-    layout->addWidget(updateTitle);
+    layout->addWidget(aboutTitle);
+
+    auto makeHelpRow = [&](const QString &labelText, const QString &buttonText, const auto &handler) {
+        auto *row = new QFrame(content);
+        row->setObjectName(QStringLiteral("settingsCard"));
+        row->setProperty("settingsCardVariant", QStringLiteral("link"));
+        auto *rowLayout = new QHBoxLayout(row);
+        rowLayout->setContentsMargins(14, 12, 14, 12);
+        rowLayout->setSpacing(10);
+
+        auto *label = new QLabel(labelText, row);
+        auto *button = new QPushButton(buttonText, row);
+        button->setCursor(Qt::PointingHandCursor);
+        connect(button, &QPushButton::clicked, this, handler);
+
+        rowLayout->addWidget(label);
+        rowLayout->addStretch();
+        rowLayout->addWidget(button);
+        layout->addWidget(row);
+    };
+
+    makeHelpRow(QStringLiteral("关于"), QStringLiteral("Screen Time %1").arg(QStringLiteral(SCREENTIME_VERSION)), [this]() {
+        QMessageBox::about(this,
+                           QStringLiteral("关于 Screen Time"),
+                           QStringLiteral("Screen Time\n版本：%1").arg(QStringLiteral(SCREENTIME_VERSION)));
+    });
+    makeHelpRow(QStringLiteral("隐私政策"), QStringLiteral("打开隐私政策"), []() {
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://yiukblog.xyz")));
+    });
+    makeHelpRow(QStringLiteral("项目地址"), QStringLiteral("Yiuk-max/Screen-Time"), []() {
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Yiuk-max/Screen-Time")));
+    });
+
     layout->addWidget(versionRow);
-
-    // 检查更新按钮行
-    auto *checkUpdateRow = new QFrame(content);
-    checkUpdateRow->setObjectName(QStringLiteral("settingsCard"));
-    checkUpdateRow->setProperty("settingsCardVariant", QStringLiteral("secondaryButton"));
-    auto *checkUpdateLayout = new QHBoxLayout(checkUpdateRow);
-    checkUpdateLayout->setContentsMargins(14, 12, 14, 12);
-    checkUpdateLayout->setSpacing(12);
-
-    auto *checkUpdateLabel = new QLabel(QStringLiteral("检查更新"), checkUpdateRow);
-    m_checkUpdateButton = new QPushButton(QStringLiteral("立即检查"), checkUpdateRow);
-    m_checkUpdateButton->setCursor(Qt::PointingHandCursor);
-    connect(m_checkUpdateButton, &QPushButton::clicked, this, [this]() {
-        if (m_checkUpdateButton) {
-            m_checkUpdateButton->setEnabled(false);
-            m_checkUpdateButton->setText(QStringLiteral("检查中..."));
-        }
-        if (m_updater) {
-            m_updater->checkForUpdates(false);
-        }
-    });
-
-    checkUpdateLayout->addWidget(checkUpdateLabel);
-    checkUpdateLayout->addStretch();
-    checkUpdateLayout->addWidget(m_checkUpdateButton);
-
-    layout->addWidget(checkUpdateRow);
-
-    // 自动检查更新开关
-    auto *autoCheckRow = new QFrame(content);
-    autoCheckRow->setObjectName(QStringLiteral("settingsCard"));
-    auto *autoCheckLayout = new QHBoxLayout(autoCheckRow);
-    autoCheckLayout->setContentsMargins(14, 12, 14, 12);
-    autoCheckLayout->setSpacing(12);
-
-    auto *autoCheckLabel = new QLabel(QStringLiteral("后台自动检查更新"), autoCheckRow);
-    m_autoCheckUpdateSwitch = new QCheckBox(autoCheckRow);
-    m_autoCheckUpdateSwitch->setCursor(Qt::PointingHandCursor);
-    m_autoCheckUpdateSwitch->setChecked(true); // 默认开启
-    m_autoCheckUpdateSwitch->setStyleSheet(toggleSwitchStyle);
-
-    // 自动更新开关滑块
-    auto *autoUpdateThumb = new QLabel(m_autoCheckUpdateSwitch);
-    autoUpdateThumb->setFixedSize(18, 18);
-    autoUpdateThumb->setStyleSheet(QStringLiteral("background-color: white; border-radius: 9px;"));
-    autoUpdateThumb->move(3, 3);
-    connect(m_autoCheckUpdateSwitch, &QCheckBox::toggled, autoUpdateThumb, [autoUpdateThumb](bool checked) {
-        autoUpdateThumb->move(checked ? 23 : 3, 3);
-    });
-
-    autoCheckLayout->addWidget(autoCheckLabel);
-    autoCheckLayout->addStretch();
-    autoCheckLayout->addWidget(m_autoCheckUpdateSwitch);
-
-    layout->addWidget(autoCheckRow);
-
-    // 更新日志区域
-    auto *releaseNotesLabel = new QLabel(QStringLiteral("更新日志"), content);
-    releaseNotesLabel->setObjectName(QStringLiteral("settingsMutedLabel"));
-    releaseNotesLabel->setStyleSheet(QStringLiteral("font-size: 14px; margin-top: 8px;"));
-
-    m_releaseNotesEdit = new QTextEdit(content);
-    m_releaseNotesEdit->setReadOnly(true);
-    m_releaseNotesEdit->setMaximumHeight(120);
-
-    layout->addWidget(releaseNotesLabel);
-    layout->addWidget(m_releaseNotesEdit);
     layout->addStretch();
 
     scrollArea->setWidget(content);
@@ -875,14 +783,8 @@ void MainWindow::applyTheme(AppThemeKind kind)
         if (m_deepseekApiKeyEdit) {
             m_deepseekApiKeyEdit->setStyleSheet(QString());
         }
-        if (m_releaseNotesEdit) {
-            m_releaseNotesEdit->setStyleSheet(textEditStyleSheet(m_theme));
-        }
         if (m_versionLabel) {
             m_versionLabel->setStyleSheet(QStringLiteral("color: %1;").arg(m_theme.textMuted));
-        }
-        if (m_checkUpdateButton) {
-            m_checkUpdateButton->setStyleSheet(secondaryButtonStyleSheet(m_theme));
         }
         for (QLabel *label : m_settingsContent->findChildren<QLabel *>()) {
             const QString name = label->objectName();
@@ -907,158 +809,6 @@ void MainWindow::fillAppStatsForDaily()
 {
     refreshAppStatsList(m_dailyAppStats);
     updateDailyChartAndSummary();
-}
-
-// ========== 自动更新槽函数 ==========
-
-void MainWindow::onUpdateAvailable(const QString &latestVersion, const QString &downloadUrl, const QString &releaseNotes)
-{
-    if (m_checkUpdateButton) {
-        m_checkUpdateButton->setEnabled(true);
-        QVersionNumber currentVer = QVersionNumber::fromString(m_updater ? m_updater->currentVersion() : "0.1.0");
-        QVersionNumber latestVer = QVersionNumber::fromString(latestVersion);
-
-        if (latestVer > currentVer) {
-            m_checkUpdateButton->setText(QStringLiteral("点击下载更新"));
-            // 连接下载按钮
-            disconnect(m_checkUpdateButton, &QPushButton::clicked, nullptr, nullptr);
-            connect(m_checkUpdateButton, &QPushButton::clicked, this, [this, downloadUrl]() {
-                if (m_updater) {
-                    m_updater->downloadAndInstallUpdate(downloadUrl);
-                }
-            });
-        } else {
-            // 版本一样或更旧，显示为当前最新
-            m_checkUpdateButton->setText(QStringLiteral("立即检查"));
-        }
-    }
-
-    m_pendingUpdateUrl = downloadUrl;
-
-    if (m_versionLabel) {
-        QString text = QStringLiteral("%1 → %2").arg(m_updater ? m_updater->currentVersion() : QStringLiteral("0.1.0"), latestVersion);
-        m_versionLabel->setText(text);
-        m_versionLabel->setStyleSheet(QStringLiteral("color: rgb(70,190,90); font-weight: 600;"));
-    }
-
-    if (m_releaseNotesEdit) {
-        m_releaseNotesEdit->setPlainText(releaseNotes.isEmpty() ? QStringLiteral("暂无更新说明") : releaseNotes);
-    }
-
-    // 弹窗通知用户
-    if (m_trayIcon) {
-        m_trayIcon->showMessage(
-            QStringLiteral("发现新版本"),
-            QStringLiteral("Screen Time %1 可用，点击设置页面下载更新").arg(latestVersion),
-            QSystemTrayIcon::Information,
-            5000
-        );
-    }
-}
-
-void MainWindow::onNoUpdateAvailable()
-{
-    if (m_checkUpdateButton) {
-        m_checkUpdateButton->setEnabled(true);
-        m_checkUpdateButton->setText(QStringLiteral("立即检查"));
-    }
-
-    if (m_releaseNotesEdit) {
-        m_releaseNotesEdit->setPlainText(QStringLiteral("当前已是最新版本"));
-    }
-}
-
-void MainWindow::onUpdateCheckFailed(const QString &error)
-{
-    if (m_checkUpdateButton) {
-        m_checkUpdateButton->setEnabled(true);
-        m_checkUpdateButton->setText(QStringLiteral("立即检查"));
-    }
-
-    if (m_releaseNotesEdit) {
-        m_releaseNotesEdit->setPlainText(QStringLiteral("检查失败: %1").arg(error));
-    }
-}
-
-void MainWindow::onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal)
-{
-    if (m_checkUpdateButton) {
-        const int percent = bytesTotal > 0 ? (bytesReceived * 100 / bytesTotal) : 0;
-        m_checkUpdateButton->setText(QStringLiteral("下载中 %1%").arg(percent));
-    }
-}
-
-void MainWindow::onDownloadFinished(const QString &filePath)
-{
-    if (m_checkUpdateButton) {
-        m_checkUpdateButton->setText(QStringLiteral("正在安装..."));
-        m_checkUpdateButton->setEnabled(false);
-    }
-    qDebug() << "Update downloaded to:" << filePath;
-
-    // 自动执行安装（解压 + 替换 + 重启）
-    onInstallUpdateRequested(filePath);
-}
-
-void MainWindow::onDownloadFailed(const QString &error)
-{
-    if (m_checkUpdateButton) {
-        m_checkUpdateButton->setEnabled(true);
-        m_checkUpdateButton->setText(QStringLiteral("下载失败，重试"));
-        // 连接重试
-        disconnect(m_checkUpdateButton, &QPushButton::clicked, nullptr, nullptr);
-        connect(m_checkUpdateButton, &QPushButton::clicked, this, [this]() {
-            if (m_updater && !m_pendingUpdateUrl.isEmpty()) {
-                m_updater->downloadAndInstallUpdate(m_pendingUpdateUrl);
-            }
-        });
-    }
-
-    if (m_releaseNotesEdit) {
-        m_releaseNotesEdit->setPlainText(QStringLiteral("下载失败: %1").arg(error));
-    }
-}
-
-void MainWindow::onInstallUpdateRequested(const QString &zipFilePath)
-{
-    // 实现自动更新：解压 → 替换 exe → 重启
-    qDebug() << "Install update from:" << zipFilePath;
-
-    // 创建一个批处理脚本放在临时目录
-    const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    const QString batPath = QDir(tempDir).absoluteFilePath("ScreenTime_Update.bat");
-
-    const QString appPath = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
-    const QString zipNative = QDir::toNativeSeparators(zipFilePath);
-    const QString appDir = QDir::toNativeSeparators(QCoreApplication::applicationDirPath());
-
-    QFile batFile(batPath);
-    if (batFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QTextStream bat(&batFile);
-        bat.setEncoding(QStringConverter::Utf8);
-        bat << QStringLiteral("@echo off\n");
-        bat << QStringLiteral("chcp 65001 >nul\n");
-        bat << QStringLiteral("echo 正在更新 Screen Time...\n");
-        bat << QStringLiteral("timeout /t 2 /nobreak >nul\n");
-        // 用 PowerShell 解压 zip 到应用目录
-        bat << QStringLiteral("powershell -Command \"Expand-Archive -Path '%1' -DestinationPath '%2' -Force\"\n").arg(zipNative, appDir);
-        bat << QStringLiteral("if %errorlevel% neq 0 (\n");
-        bat << QStringLiteral("  echo 解压失败，尝试用 tar...\n");
-        bat << QStringLiteral("  tar -xf \"%1\" -C \"%2\"\n").arg(zipNative, appDir);
-        bat << QStringLiteral(")\n");
-        bat << QStringLiteral("echo 更新完成，正在启动...\n");
-        bat << QStringLiteral("start \"\" \"%1\"\n").arg(appPath);
-        bat << QStringLiteral("del \"%~f0\"\n");
-        batFile.close();
-
-        // 执行批处理，退出当前进程
-        QProcess::startDetached(QStringLiteral("cmd.exe"), {QStringLiteral("/c"), batPath});
-        QApplication::quit();
-    } else {
-        if (m_releaseNotesEdit) {
-            m_releaseNotesEdit->append(QStringLiteral("\n[错误] 无法创建更新脚本"));
-        }
-    }
 }
 
 void MainWindow::fillAppStatsForWeekly()
@@ -1327,20 +1077,9 @@ void MainWindow::setupTrayIcon()
     m_trayIcon = new QSystemTrayIcon(this);
 
     // 用齿轮 SVG 作为托盘图标（和设置按钮同款）
-    const QByteArray iconSvg = R"SVG(
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <rect width="24" height="24" rx="4" fill="#1a1a2e"/>
-  <circle cx="12" cy="12" r="3" fill="#4a9eff"/>
-  <path fill="#4a9eff" d="M12 2a1 1 0 0 1 1 1v1.07A8 8 0 0 1 19.93 11H21a1 1 0 0 1 0 2h-1.07A8 8 0 0 1 13 19.93V21a1 1 0 0 1-2 0v-1.07A8 8 0 0 1 4.07 13H3a1 1 0 0 1 0-2h1.07A8 8 0 0 1 11 4.07V3a1 1 0 0 1 1-1zm0 4a6 6 0 1 0 0 12A6 6 0 0 0 12 6z"/>
-</svg>
-)SVG";
-    QSvgRenderer renderer(iconSvg);
-    QPixmap pixmap(32, 32);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    renderer.render(&painter);
-    m_trayIcon->setIcon(QIcon(pixmap));
-    setWindowIcon(QIcon(pixmap));
+    const QIcon appIcon(QStringLiteral(":/icons/icons/app.png"));
+    m_trayIcon->setIcon(appIcon);
+    setWindowIcon(appIcon);
 
     m_trayIcon->setToolTip(QStringLiteral("Screen Time"));
 

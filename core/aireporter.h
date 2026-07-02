@@ -8,6 +8,11 @@
 #include <QList>
 #include "database.h"
 
+enum class AIReportKind {
+    Daily,
+    Weekly
+};
+
 class AIReporter : public QObject
 {
     Q_OBJECT
@@ -19,6 +24,10 @@ public:
     void setApiEndpoint(const QString &endpoint);
     void setModel(const QString &model);
     void setPromptTemplate(const QString &prompt);
+
+    void generateReport(AIReportKind kind,
+                        const QList<UsageRecord> &records,
+                        const QList<UsageRecord> &compareRecords = {});
 
     void generateWeeklyReport(const QList<UsageRecord> &thisWeekRecords,
                               const QList<UsageRecord> &previousWeekRecords = {});
@@ -32,11 +41,15 @@ private slots:
     void onReplyFinished();
 
 private:
-    QString buildPrompt(const QList<UsageRecord> &thisWeekRecords,
-                        const QList<UsageRecord> &previousWeekRecords) const;
-    QString formatRecordsAsText(const QList<UsageRecord> &records, const QString &label) const;
-    QString formatWeekComparison(int thisWeekSeconds, int previousWeekSeconds) const;
+    QString buildPrompt(AIReportKind kind,
+                        const QList<UsageRecord> &records,
+                        const QList<UsageRecord> &compareRecords) const;
+    QString buildStatisticsBlock(AIReportKind kind,
+                                 const QList<UsageRecord> &records,
+                                 const QList<UsageRecord> &compareRecords) const;
+    QString formatWeekComparison(int thisSeconds, int previousSeconds) const;
     int totalDurationSeconds(const QList<UsageRecord> &records) const;
+    static QString systemPromptForKind(AIReportKind kind);
 
     QNetworkAccessManager m_networkManager;
     QString m_apiKey;

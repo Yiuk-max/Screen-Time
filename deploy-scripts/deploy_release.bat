@@ -20,13 +20,13 @@ if "%EXE_PATH%"=="" (
     for /f "delims=" %%F in ('dir /b /s "%BUILD_DIR%\%EXE_NAME%" 2^>nul') do (
         set "CAND=%%F"
         set "SCORE=0"
-        echo !CAND! | findstr /i "mingw-release" >nul && set /a SCORE+=150
-        echo !CAND! | findstr /i "\\Release\\" >nul && set /a SCORE+=120
-        echo !CAND! | findstr /i "\\release\\" >nul && set /a SCORE+=120
-        echo !CAND! | findstr /i "-Release\\" >nul && set /a SCORE+=120
-        echo !CAND! | findstr /i "\\bin\\" >nul && set /a SCORE+=20
-        echo !CAND! | findstr /i "Debug" >nul && set /a SCORE-=200
-        echo !CAND! | findstr /i "debug" >nul && set /a SCORE-=200
+        if /i not "!CAND:mingw-release=!"=="!CAND!" set /a SCORE+=150
+        if /i not "!CAND:\Release\=!"=="!CAND!" set /a SCORE+=120
+        if /i not "!CAND:\release\=!"=="!CAND!" set /a SCORE+=120
+        if /i not "!CAND:-Release\=!"=="!CAND!" set /a SCORE+=120
+        if /i not "!CAND:\bin\=!"=="!CAND!" set /a SCORE+=20
+        if /i not "!CAND:Debug=!"=="!CAND!" set /a SCORE-=200
+        if /i not "!CAND:debug=!"=="!CAND!" set /a SCORE-=200
         if !SCORE! gtr !BEST_SCORE! (
             set "BEST_SCORE=!SCORE!"
             set "EXE_PATH=!CAND!"
@@ -98,7 +98,7 @@ if exist "%PROJECT_ROOT%\icons" (
 set "ZIP_PATH=%RELEASE_ROOT%\ScreenTime_%APP_VERSION%.zip"
 if exist "%ZIP_PATH%" del /f /q "%ZIP_PATH%"
 
-echo [INFO] Creating zip for GitHub release / auto-update...
+echo [INFO] Creating zip for release distribution...
 powershell -NoProfile -Command "Compress-Archive -Path '%APP_DIR%\*' -DestinationPath '%ZIP_PATH%' -Force"
 if errorlevel 1 (
     echo [ERROR] Failed to create zip package.

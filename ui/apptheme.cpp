@@ -8,55 +8,55 @@ AppThemeColors appThemeColors(AppThemeKind kind)
     theme.kind = kind;
 
     if (kind == AppThemeKind::Light) {
-        // 柔和浅灰，避免纯白刺眼
-        theme.windowBackground = QStringLiteral("rgb(218, 220, 226)");
-        theme.textPrimary = QStringLiteral("rgb(52, 54, 60)");
-        theme.textSecondary = QStringLiteral("rgb(92, 96, 104)");
-        theme.textMuted = QStringLiteral("rgb(118, 122, 132)");
-        theme.textAccent = QStringLiteral("rgb(56, 98, 168)");
-        theme.panelBackground = QStringLiteral("rgb(232, 234, 240)");
-        theme.panelBorder = QStringLiteral("rgb(198, 202, 212)");
-        theme.inputBackground = QStringLiteral("rgb(224, 226, 232)");
-        theme.inputBorder = QStringLiteral("rgb(190, 194, 204)");
-        theme.linkColor = QStringLiteral("rgb(56, 98, 168)");
-        theme.linkHoverColor = QStringLiteral("rgb(76, 118, 188)");
+        // Windows 11 浅色：背景 #f3f3f3，卡片 #ffffff
+        theme.windowBackground = QStringLiteral("rgb(243, 243, 243)");
+        theme.textPrimary = QStringLiteral("rgb(0, 0, 0)");
+        theme.textSecondary = QStringLiteral("rgb(96, 96, 96)");
+        theme.textMuted = QStringLiteral("rgb(128, 128, 128)");
+        theme.textAccent = QStringLiteral("rgb(0, 103, 192)");
+        theme.panelBackground = QStringLiteral("rgb(255, 255, 255)");
+        theme.panelBorder = QStringLiteral("rgb(229, 229, 229)");
+        theme.inputBackground = QStringLiteral("rgb(255, 255, 255)");
+        theme.inputBorder = QStringLiteral("rgb(204, 204, 204)");
+        theme.linkColor = QStringLiteral("rgb(0, 103, 192)");
+        theme.linkHoverColor = QStringLiteral("rgb(0, 83, 162)");
 
-        theme.sidebarToggleBackground = QStringLiteral("rgb(228, 230, 236)");
-        theme.sidebarToggleBorder = QStringLiteral("rgb(190, 194, 204)");
-        theme.sidebarToggleHover = QStringLiteral("rgb(220, 222, 228)");
-        theme.sidebarToggleText = QStringLiteral("rgb(68, 72, 80)");
+        theme.sidebarToggleBackground = QStringLiteral("rgb(255, 255, 255)");
+        theme.sidebarToggleBorder = QStringLiteral("rgb(204, 204, 204)");
+        theme.sidebarToggleHover = QStringLiteral("rgb(245, 245, 245)");
+        theme.sidebarToggleText = QStringLiteral("rgb(32, 32, 32)");
 
-        theme.navButtonBackground = QStringLiteral("rgb(228, 230, 236)");
-        theme.navButtonBorder = QStringLiteral("rgb(190, 194, 204)");
-        theme.navButtonCheckedBackground = QStringLiteral("rgb(214, 224, 242)");
-        theme.navButtonCheckedBorder = QStringLiteral("rgb(160, 180, 220)");
-        theme.navButtonHoverBackground = QStringLiteral("rgb(222, 224, 230)");
-        theme.navButtonText = QStringLiteral("rgb(52, 54, 60)");
+        theme.navButtonBackground = QStringLiteral("rgb(255, 255, 255)");
+        theme.navButtonBorder = QStringLiteral("rgb(229, 229, 229)");
+        theme.navButtonCheckedBackground = QStringLiteral("rgb(237, 244, 252)");
+        theme.navButtonCheckedBorder = QStringLiteral("rgb(0, 103, 192)");
+        theme.navButtonHoverBackground = QStringLiteral("rgb(248, 248, 248)");
+        theme.navButtonText = QStringLiteral("rgb(0, 0, 0)");
 
-        theme.periodButtonBackground = QStringLiteral("rgb(228, 230, 236)");
-        theme.periodButtonBorder = QStringLiteral("rgb(190, 194, 204)");
-        theme.periodButtonCheckedBackground = QStringLiteral("rgb(214, 224, 242)");
-        theme.periodButtonText = QStringLiteral("rgb(52, 54, 60)");
+        theme.periodButtonBackground = QStringLiteral("rgb(255, 255, 255)");
+        theme.periodButtonBorder = QStringLiteral("rgb(229, 229, 229)");
+        theme.periodButtonCheckedBackground = QStringLiteral("rgb(237, 244, 252)");
+        theme.periodButtonText = QStringLiteral("rgb(0, 0, 0)");
 
-        theme.splitterHandle = QStringLiteral("rgb(190, 194, 204)");
-        theme.splitterHandleHover = QStringLiteral("rgb(168, 172, 184)");
+        theme.splitterHandle = QStringLiteral("rgb(229, 229, 229)");
+        theme.splitterHandleHover = QStringLiteral("rgb(204, 204, 204)");
 
-        theme.scrollTrack = QStringLiteral("rgb(210, 212, 220)");
-        theme.scrollHandle = QStringLiteral("rgb(178, 182, 192)");
-        theme.scrollHandleHover = QStringLiteral("rgb(158, 162, 174)");
+        theme.scrollTrack = QStringLiteral("rgb(243, 243, 243)");
+        theme.scrollHandle = QStringLiteral("rgb(196, 196, 196)");
+        theme.scrollHandleHover = QStringLiteral("rgb(168, 168, 168)");
 
-        theme.listBackground = QStringLiteral("rgb(232, 234, 240)");
-        theme.listItemBackground = QStringLiteral("rgb(224, 226, 232)");
-        theme.listItemSelected = QStringLiteral("rgb(214, 224, 242)");
+        theme.listBackground = QStringLiteral("rgb(255, 255, 255)");
+        theme.listItemBackground = QStringLiteral("rgb(248, 248, 248)");
+        theme.listItemSelected = QStringLiteral("rgb(237, 244, 252)");
 
         theme.primaryButtonBackground = QStringLiteral("rgb(70,130,180)");
         theme.primaryButtonHover = QStringLiteral("rgb(90,150,200)");
         theme.primaryButtonDisabledBackground = QStringLiteral("rgb(200, 204, 214)");
         theme.primaryButtonDisabledText = QStringLiteral("rgb(140, 144, 154)");
 
-        theme.secondaryButtonBackground = QStringLiteral("rgb(224, 226, 232)");
-        theme.secondaryButtonBorder = QStringLiteral("rgb(190, 194, 204)");
-        theme.secondaryButtonHover = QStringLiteral("rgb(216, 218, 226)");
+        theme.secondaryButtonBackground = QStringLiteral("rgb(255, 255, 255)");
+        theme.secondaryButtonBorder = QStringLiteral("rgb(204, 204, 204)");
+        theme.secondaryButtonHover = QStringLiteral("rgb(248, 248, 248)");
 
         theme.chart.background = QColor(228, 230, 236);
         theme.chart.grid = QColor(198, 202, 212);
@@ -69,54 +69,55 @@ AppThemeColors appThemeColors(AppThemeKind kind)
         return theme;
     }
 
-    theme.windowBackground = QStringLiteral("rgb(24,24,26)");
-    theme.textPrimary = QStringLiteral("rgb(235,235,240)");
-    theme.textSecondary = QStringLiteral("rgb(200,200,205)");
-    theme.textMuted = QStringLiteral("rgb(150,150,155)");
-    theme.textAccent = QStringLiteral("rgb(180,200,230)");
-    theme.panelBackground = QStringLiteral("rgb(36,36,40)");
-    theme.panelBorder = QStringLiteral("rgb(58,58,64)");
-    theme.inputBackground = QStringLiteral("rgb(50,50,55)");
-    theme.inputBorder = QStringLiteral("rgb(78,78,84)");
-    theme.linkColor = QStringLiteral("rgb(157,199,255)");
-    theme.linkHoverColor = QStringLiteral("rgb(187,217,255)");
+    // Windows 11 深色：背景 #202020，卡片 #2b2b2b
+    theme.windowBackground = QStringLiteral("rgb(38, 38, 42)");
+    theme.textPrimary = QStringLiteral("rgb(255, 255, 255)");
+    theme.textSecondary = QStringLiteral("rgb(200, 200, 200)");
+    theme.textMuted = QStringLiteral("rgb(153, 153, 153)");
+    theme.textAccent = QStringLiteral("rgb(96, 205, 255)");
+    theme.panelBackground = QStringLiteral("rgb(43, 43, 43)");
+    theme.panelBorder = QStringLiteral("rgb(60, 60, 60)");
+    theme.inputBackground = QStringLiteral("rgb(50, 50, 50)");
+    theme.inputBorder = QStringLiteral("rgb(70, 70, 70)");
+    theme.linkColor = QStringLiteral("rgb(96, 205, 255)");
+    theme.linkHoverColor = QStringLiteral("rgb(140, 220, 255)");
 
-    theme.sidebarToggleBackground = QStringLiteral("rgb(42,42,46)");
-    theme.sidebarToggleBorder = QStringLiteral("rgb(58,58,64)");
-    theme.sidebarToggleHover = QStringLiteral("rgb(52,52,58)");
-    theme.sidebarToggleText = QStringLiteral("rgb(210,210,215)");
+    theme.sidebarToggleBackground = QStringLiteral("rgb(43, 43, 43)");
+    theme.sidebarToggleBorder = QStringLiteral("rgb(60, 60, 60)");
+    theme.sidebarToggleHover = QStringLiteral("rgb(55, 55, 55)");
+    theme.sidebarToggleText = QStringLiteral("rgb(255, 255, 255)");
 
-    theme.navButtonBackground = QStringLiteral("rgb(34,34,38)");
-    theme.navButtonBorder = QStringLiteral("rgb(48,48,52)");
-    theme.navButtonCheckedBackground = QStringLiteral("rgb(44,44,48)");
-    theme.navButtonCheckedBorder = QStringLiteral("rgb(76,76,84)");
-    theme.navButtonHoverBackground = QStringLiteral("rgb(42,42,46)");
-    theme.navButtonText = QStringLiteral("rgb(220,220,225)");
+    theme.navButtonBackground = QStringLiteral("rgb(43, 43, 43)");
+    theme.navButtonBorder = QStringLiteral("rgb(55, 55, 55)");
+    theme.navButtonCheckedBackground = QStringLiteral("rgb(55, 55, 55)");
+    theme.navButtonCheckedBorder = QStringLiteral("rgb(80, 80, 80)");
+    theme.navButtonHoverBackground = QStringLiteral("rgb(50, 50, 50)");
+    theme.navButtonText = QStringLiteral("rgb(255, 255, 255)");
 
-    theme.periodButtonBackground = QStringLiteral("rgb(34,34,38)");
-    theme.periodButtonBorder = QStringLiteral("rgb(48,48,52)");
-    theme.periodButtonCheckedBackground = QStringLiteral("rgb(44,44,48)");
-    theme.periodButtonText = QStringLiteral("rgb(220,220,225)");
+    theme.periodButtonBackground = QStringLiteral("rgb(43, 43, 43)");
+    theme.periodButtonBorder = QStringLiteral("rgb(55, 55, 55)");
+    theme.periodButtonCheckedBackground = QStringLiteral("rgb(55, 55, 55)");
+    theme.periodButtonText = QStringLiteral("rgb(255, 255, 255)");
 
-    theme.splitterHandle = QStringLiteral("rgb(58,58,64)");
-    theme.splitterHandleHover = QStringLiteral("rgb(88,88,96)");
+    theme.splitterHandle = QStringLiteral("rgb(60, 60, 60)");
+    theme.splitterHandleHover = QStringLiteral("rgb(80, 80, 80)");
 
-    theme.scrollTrack = QStringLiteral("rgb(40,40,44)");
-    theme.scrollHandle = QStringLiteral("rgb(80,80,85)");
-    theme.scrollHandleHover = QStringLiteral("rgb(100,100,105)");
+    theme.scrollTrack = QStringLiteral("rgb(38, 38, 42)");
+    theme.scrollHandle = QStringLiteral("rgb(80, 80, 80)");
+    theme.scrollHandleHover = QStringLiteral("rgb(100, 100, 100)");
 
-    theme.listBackground = QStringLiteral("rgb(36,36,40)");
-    theme.listItemBackground = QStringLiteral("rgb(42,42,46)");
-    theme.listItemSelected = QStringLiteral("rgb(52,52,58)");
+    theme.listBackground = QStringLiteral("rgb(43, 43, 43)");
+    theme.listItemBackground = QStringLiteral("rgb(50, 50, 50)");
+    theme.listItemSelected = QStringLiteral("rgb(55, 55, 55)");
 
     theme.primaryButtonBackground = QStringLiteral("rgb(70,130,180)");
     theme.primaryButtonHover = QStringLiteral("rgb(90,150,200)");
     theme.primaryButtonDisabledBackground = QStringLiteral("rgb(60,60,65)");
     theme.primaryButtonDisabledText = QStringLiteral("rgb(150,150,155)");
 
-    theme.secondaryButtonBackground = QStringLiteral("rgb(50,50,55)");
-    theme.secondaryButtonBorder = QStringLiteral("rgb(78,78,84)");
-    theme.secondaryButtonHover = QStringLiteral("rgb(60,60,65)");
+    theme.secondaryButtonBackground = QStringLiteral("rgb(50, 50, 50)");
+    theme.secondaryButtonBorder = QStringLiteral("rgb(70, 70, 70)");
+    theme.secondaryButtonHover = QStringLiteral("rgb(60, 60, 60)");
 
     theme.chart.background = QColor(28, 28, 30);
     theme.chart.grid = QColor(78, 78, 82);
@@ -161,9 +162,11 @@ QString scrollAreaStyleSheet(const AppThemeColors &theme)
 {
     return QStringLiteral(
                "QScrollArea { border: none; background-color: transparent; }"
-               "QScrollBar:vertical { background: %1; width: 8px; }"
-               "QScrollBar::handle:vertical { background: %2; border-radius: 4px; }"
-               "QScrollBar::handle:vertical:hover { background: %3; }")
+               "QScrollBar:vertical { background: %1; width: 10px; margin: 0; border: none; }"
+               "QScrollBar::handle:vertical { background: %2; border-radius: 5px; min-height: 32px; }"
+               "QScrollBar::handle:vertical:hover { background: %3; }"
+               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border: none; background: transparent; }"
+               "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
         .arg(theme.scrollTrack, theme.scrollHandle, theme.scrollHandleHover);
 }
 
@@ -300,12 +303,26 @@ QString listWidgetStyleSheet(const AppThemeColors &theme)
                "QListWidget::item {"
                "  background-color: %4; border-radius: 8px; margin: 2px 0; padding: 6px 8px;"
                "}"
-               "QListWidget::item:selected { background-color: %5; }")
+               "QListWidget::item:selected { background-color: %5; }"
+               "QScrollBar:vertical {"
+               "  background: %6; width: 12px; margin: 0; border: none; border-radius: 6px;"
+               "}"
+               "QScrollBar::handle:vertical {"
+               "  background: %7; border-radius: 6px; min-height: 36px;"
+               "}"
+               "QScrollBar::handle:vertical:hover { background: %8; }"
+               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
+               "  height: 0; border: none; background: transparent;"
+               "}"
+               "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
         .arg(theme.listBackground,
              theme.panelBorder,
              theme.textPrimary,
              theme.listItemBackground,
-             theme.listItemSelected);
+             theme.listItemSelected,
+             theme.scrollTrack,
+             theme.scrollHandle,
+             theme.scrollHandleHover);
 }
 
 QString primaryButtonStyleSheet(const AppThemeColors &theme)

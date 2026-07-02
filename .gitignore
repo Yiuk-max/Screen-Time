@@ -1,0 +1,75 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.workspace.user
+*.workspace.user.*
+
+# Visual Studio / VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Debug files
+*.pdb
+*.ilk
+
+# Qt moc files
+moc_*.cpp
+moc_*.h
+
+# Qt uic files
+ui_*.h
+
+# Qt rcc files
+qrc_*.cpp
+qrc_*.h
+
+# Backup files
+*~
+*.bak
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Release package
+release-package/

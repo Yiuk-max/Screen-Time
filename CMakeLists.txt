@@ -29,10 +29,10 @@ qt_add_executable(ScreenTime
     core/database.h
     core/tracker.cpp
     core/tracker.h
-    core/updater.cpp
-    core/updater.h
 	    core/aireporter.cpp
 	    core/aireporter.h
+	    core/appnameresolver.cpp
+	    core/appnameresolver.h
     ui/hourlychartwidget.cpp
     ui/hourlychartwidget.h
 	    ui/aireportpage.cpp
@@ -41,6 +41,7 @@ qt_add_executable(ScreenTime
 	    ui/apptheme.h
     ui/mainwindow.cpp
     ui/mainwindow.h
+    resources.qrc
 )
 
 # Link Qt libraries
@@ -60,6 +61,22 @@ if(WIN32)
         user32
         psapi
     )
+
+    if(MINGW)
+        find_program(WINDRES_EXECUTABLE windres)
+        if(WINDRES_EXECUTABLE)
+            set(APP_ICON_OBJECT "${CMAKE_CURRENT_BINARY_DIR}/app_icon.obj")
+            add_custom_command(
+                OUTPUT "${APP_ICON_OBJECT}"
+                COMMAND "${WINDRES_EXECUTABLE}" -O coff -i "${CMAKE_CURRENT_SOURCE_DIR}/app.rc" -o "${APP_ICON_OBJECT}"
+                DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/app.rc" "${CMAKE_CURRENT_SOURCE_DIR}/icons/app.ico"
+                VERBATIM
+            )
+            target_sources(ScreenTime PRIVATE "${APP_ICON_OBJECT}")
+        endif()
+    else()
+        target_sources(ScreenTime PRIVATE app.rc)
+    endif()
 endif()
 
 # Include project root directory so headers in core/ and ui/ can be found
