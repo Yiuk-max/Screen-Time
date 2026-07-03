@@ -9,6 +9,12 @@ enum class AppThemeKind {
     Light
 };
 
+enum class AccentColor {
+    Purple,
+    Blue,
+    Orange
+};
+
 struct ChartThemeColors {
     QColor background;
     QColor grid;
@@ -22,6 +28,7 @@ struct ChartThemeColors {
 
 struct AppThemeColors {
     AppThemeKind kind = AppThemeKind::Dark;
+    AccentColor accent = AccentColor::Purple;
 
     QString windowBackground;
     QString textPrimary;
@@ -35,6 +42,7 @@ struct AppThemeColors {
     QString linkColor;
     QString linkHoverColor;
 
+    QString sideBarBackground;
     QString sidebarToggleBackground;
     QString sidebarToggleBorder;
     QString sidebarToggleHover;
@@ -74,16 +82,20 @@ struct AppThemeColors {
 
     ChartThemeColors chart;
 };
-
-AppThemeColors appThemeColors(AppThemeKind kind);
+AppThemeColors appThemeColors(AppThemeKind kind, AccentColor accent = AccentColor::Purple);
 QString themeStorageKey();
 AppThemeKind loadSavedThemeKind();
 void saveThemeKind(AppThemeKind kind);
+QString accentColorStorageKey();
+AccentColor loadSavedAccentColor();
+void saveAccentColor(AccentColor accent);
+QString accentColorName(AccentColor accent);
+QColor accentColorValue(AccentColor accent, AppThemeKind kind);
 
 QString windowStyleSheet(const AppThemeColors &theme);
 QString scrollAreaStyleSheet(const AppThemeColors &theme);
 QString settingsCardStyleSheet(const AppThemeColors &theme);
-QString comboBoxStyleSheet(const AppThemeColors &theme);
+QString comboBoxStyleSheet(const AppThemeColors &theme, bool useAccentHighlight = true);
 QString lineEditStyleSheet(const AppThemeColors &theme);
 QString textEditStyleSheet(const AppThemeColors &theme);
 QString navButtonStyleSheet(const AppThemeColors &theme, bool expanded);
@@ -99,3 +111,4 @@ QString aiReportPageStyleSheet(const AppThemeColors &theme);
 QString aiReportBlockStyleSheet(const AppThemeColors &theme);
 
 #endif // APPTHEME_H
+

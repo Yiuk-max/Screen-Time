@@ -1,3 +1,4 @@
+
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 #include <QIcon>
@@ -48,9 +49,9 @@ private:
     bool setAutoStartEnabled(bool enabled) const;
     QString startupLaunchMode() const;
     void setStartupLaunchMode(const QString &mode) const;
-    void applySidebarMode(bool expanded);
+        void applySidebarMode(bool expanded);
     void clampUsageSplitter();
-    void applyTheme(AppThemeKind kind);
+    void applyTheme(AppThemeKind kind, AccentColor accent = AccentColor::Purple);
     void applyCurrentTheme();
     void syncAIReportSettings();
     QIcon iconForApp(const QString &appName) const;
@@ -87,8 +88,10 @@ private:
     QFrame *m_chartPanel = nullptr;
     QLabel *m_statsTitleLabel = nullptr;
     QScrollArea *m_settingsScrollArea = nullptr;
-    QWidget *m_settingsContent = nullptr;
+            QWidget *m_settingsContent = nullptr;
     QComboBox *m_themeCombo = nullptr;
+    QComboBox *m_accentCombo = nullptr;
+    QCheckBox *m_notificationSwitch = nullptr;
 
     QSystemTrayIcon *m_trayIcon = nullptr;  // 托盘图标
     QMenu *m_trayMenu = nullptr;            // 托盘右键菜单

@@ -39,9 +39,14 @@
 #include <QPainter>
 #include <QSize>
 #include <QVBoxLayout>
+#include <QVariant>
 #include <QLineEdit>
 #include <QWidget>
 #include <QScrollArea>
+#include <QPropertyAnimation>
+#include <QProcess>
+#include <QApplication>
+#include <QEasingCurve>
 
 #ifndef SCREENTIME_VERSION
 #define SCREENTIME_VERSION "0.1.0"
@@ -52,14 +57,16 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
     , m_database(database)
 {
     auto *central = new QWidget(this);
+    central->setObjectName(QStringLiteral("centralWidget"));
     auto *layout = new QHBoxLayout(central);
-    layout->setContentsMargins(12, 12, 12, 12);
-    layout->setSpacing(12);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
 
     m_leftSidebar = new QWidget(central);
+    m_leftSidebar->setObjectName(QStringLiteral("sidebar"));
     m_leftSidebar->setFixedWidth(190);
     auto *sidebarLayout = new QVBoxLayout(m_leftSidebar);
-    sidebarLayout->setContentsMargins(4, 4, 4, 4);
+    sidebarLayout->setContentsMargins(8, 8, 8, 8);
     sidebarLayout->setSpacing(8);
 
     m_sidebarToggleButton = new QPushButton(QStringLiteral("☰"), m_leftSidebar);
@@ -79,26 +86,9 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
 
     // --- 主页按钮（最上方） ---
     m_homeButton = new QPushButton(m_leftSidebar);
-    m_homeButton->setFixedSize(176, 48);
+    m_homeButton->setFixedSize(174, 44);
     m_homeButton->setCheckable(true);
-    m_homeButton->setText(QStringLiteral("  主页"));
-    m_homeButton->setStyleSheet(QStringLiteral(
-        "QPushButton {"
-        "  color: rgb(220,220,225);"
-        "  background-color: rgb(34,34,38);"
-        "  border: 1px solid rgb(48,48,52);"
-        "  border-radius: 8px;"
-        "  text-align: left;"
-        "  padding-left: 10px;"
-        "  font-size: 14px;"
-        "}"
-        "QPushButton:checked {"
-        "  background-color: rgb(44,44,48);"
-        "  border-color: rgb(76,76,84);"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: rgb(42,42,46);"
-        "}"));
+    m_homeButton->setText(QStringLiteral("  主页"));;
 
     const QByteArray homeBtnSvg = R"SVG(
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -126,26 +116,9 @@ MainWindow::MainWindow(Database *database, QWidget *parent)
 
     // --- 分析报告按钮（主页下方） ---
     m_aiReportButton = new QPushButton(m_leftSidebar);
-    m_aiReportButton->setFixedSize(176, 48);
+    m_aiReportButton->setFixedSize(174, 44);
     m_aiReportButton->setCheckable(true);
     m_aiReportButton->setText(QStringLiteral("  分析报告"));
-    m_aiReportButton->setStyleSheet(QStringLiteral(
-        "QPushButton {"
-        "  color: rgb(220,220,225);"
-        "  background-color: rgb(34,34,38);"
-        "  border: 1px solid rgb(48,48,52);"
-        "  border-radius: 8px;"
-        "  text-align: left;"
-        "  padding-left: 10px;"
-        "  font-size: 14px;"
-        "}"
-        "QPushButton:checked {"
-        "  background-color: rgb(44,44,48);"
-        "  border-color: rgb(76,76,84);"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: rgb(42,42,46);"
-        "}"));
 
     const QByteArray aiSvg = R"SVG(
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -280,6 +253,7 @@ QWidget *MainWindow::createUsagePage()
 
     auto *chartPanel = new QFrame(page);
     m_chartPanel = chartPanel;
+    chartPanel->setObjectName(QStringLiteral("chartCard"));
     chartPanel->setFrameShape(QFrame::StyledPanel);
     auto *chartLayout = new QVBoxLayout(chartPanel);
     chartLayout->setContentsMargins(10, 10, 10, 10);
@@ -292,6 +266,7 @@ QWidget *MainWindow::createUsagePage()
     chartLayout->addWidget(m_hourlyChartWidget, 1);
 
     auto *statsPanel = new QFrame(page);
+    statsPanel->setObjectName(QStringLiteral("statsCard"));
     statsPanel->setFrameShape(QFrame::NoFrame);
     auto *statsLayout = new QVBoxLayout(statsPanel);
     statsLayout->setContentsMargins(0, 0, 0, 0);
@@ -299,6 +274,7 @@ QWidget *MainWindow::createUsagePage()
     auto *statsTitle = new QLabel(QStringLiteral("应用统计"), statsPanel);
     m_statsTitleLabel = statsTitle;
     m_appStatsList = new QListWidget(statsPanel);
+    m_appStatsList->setObjectName(QStringLiteral("appStatsList"));
     statsLayout->addWidget(statsTitle);
     statsLayout->addWidget(m_appStatsList, 1);
 
@@ -353,16 +329,26 @@ QWidget *MainWindow::createSettingsPage()
 
     auto *content = new QWidget(scrollArea);
     m_settingsContent = content;
-    auto *layout = new QVBoxLayout(content);
-    layout->setContentsMargins(0, 0, 0, 0);
     scrollArea->setMinimumSize(0, 0);
     content->setMinimumSize(0, 0);
 
-    auto *title = new QLabel(QStringLiteral("设置"), content);
-    title->setObjectName(QStringLiteral("settingsPageTitle"));
-    title->setStyleSheet(QStringLiteral("font-size: 18px; font-weight: 600;"));
+    auto *wrapper = new QWidget(content);
+    wrapper->setMaximumWidth(780);
+    auto *wrapperLayout = new QVBoxLayout(wrapper);
+    wrapperLayout->setContentsMargins(4, 0, 4, 0);
+    wrapperLayout->setSpacing(10);
 
-    auto *themeRow = new QFrame(content);
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(32, 28, 32, 32);
+    layout->setSpacing(0);
+    layout->addWidget(wrapper, 1);
+
+    auto *title = new QLabel(QStringLiteral("设置"), wrapper);
+    title->setObjectName(QStringLiteral("settingsPageTitle"));
+    title->setStyleSheet(QStringLiteral("font-size: 20px; font-weight: 600;"));
+    title->setContentsMargins(0, 4, 0, 4);
+
+    auto *themeRow = new QFrame(wrapper);
     themeRow->setObjectName(QStringLiteral("settingsCard"));
     auto *themeLayout = new QHBoxLayout(themeRow);
     themeLayout->setContentsMargins(14, 12, 14, 12);
@@ -377,16 +363,82 @@ QWidget *MainWindow::createSettingsPage()
         if (!m_themeCombo) {
             return;
         }
-        const QString value = m_themeCombo->currentData().toString();
-        applyTheme(value == QStringLiteral("light") ? AppThemeKind::Light : AppThemeKind::Dark);
+                const QString value = m_themeCombo->currentData().toString();
+                const AppThemeKind newKind = value == QStringLiteral("light") ? AppThemeKind::Light : AppThemeKind::Dark;
+        applyTheme(newKind, m_theme.accent);
+        qApp->quit();
+        QProcess::startDetached(qApp->arguments()[0], qApp->arguments());
     });
     themeLayout->addWidget(themeLabel);
     themeLayout->addStretch();
     themeLayout->addWidget(m_themeCombo);
-    layout->addWidget(title);
-    layout->addWidget(themeRow);
+    wrapperLayout->addWidget(title);
+        wrapperLayout->addWidget(themeRow);
 
-    auto *autoStartRow = new QFrame(content);
+        // ── 强调色选择（下拉框）────────────────────────────────
+    auto *accentRow = new QFrame(wrapper);
+    accentRow->setObjectName(QStringLiteral("settingsCard"));
+    auto *accentLayout = new QHBoxLayout(accentRow);
+    accentLayout->setContentsMargins(14, 12, 14, 12);
+    accentLayout->setSpacing(12);
+    auto *accentLabel = new QLabel(QStringLiteral("强调色"), accentRow);
+    m_accentCombo = new QComboBox(accentRow);
+    m_accentCombo->addItem(QStringLiteral("紫色"), QVariant::fromValue(static_cast<int>(AccentColor::Purple)));
+    m_accentCombo->addItem(QStringLiteral("蓝色"), QVariant::fromValue(static_cast<int>(AccentColor::Blue)));
+    m_accentCombo->addItem(QStringLiteral("橙色"), QVariant::fromValue(static_cast<int>(AccentColor::Orange)));
+    const AccentColor savedAccent = loadSavedAccentColor();
+    m_accentCombo->setCurrentIndex(static_cast<int>(savedAccent));
+    connect(m_accentCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        if (index < 0) return;
+        const AccentColor newAccent = static_cast<AccentColor>(m_accentCombo->itemData(index).toInt());
+        saveAccentColor(newAccent);
+        applyTheme(m_theme.kind, newAccent);
+    });
+    accentLayout->addWidget(accentLabel);
+    accentLayout->addStretch();
+    accentLayout->addWidget(m_accentCombo);
+        wrapperLayout->addWidget(accentRow);
+
+    // ── 允许通知 ────────────────────────────────────────────
+    auto *notifRow = new QFrame(wrapper);
+    notifRow->setObjectName(QStringLiteral("settingsCard"));
+    auto *notifLayout = new QHBoxLayout(notifRow);
+    notifLayout->setContentsMargins(14, 12, 14, 12);
+    notifLayout->setSpacing(12);
+    auto *notifLabel = new QLabel(QStringLiteral("允许通知"), notifRow);
+    m_notificationSwitch = new QCheckBox(notifRow);
+    m_notificationSwitch->setCursor(Qt::PointingHandCursor);
+    m_notificationSwitch->setStyleSheet(QStringLiteral(
+        "QCheckBox::indicator {"
+        "  width: 44px; height: 24px; border-radius: 12px;"
+        "  background-color: rgb(95,95,102);"
+        "}"
+        "QCheckBox::indicator:checked {"
+        "  background-color: rgb(70,190,90);"
+        "}"
+        "QCheckBox::indicator::unchecked {"
+        "  image: none;"
+        "}"
+        "QCheckBox::indicator::checked {"
+        "  image: none;"
+        "}"
+        "QCheckBox::indicator {"
+        "  border: none;"
+        "}"));
+    QSettings settings(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    const bool notifEnabled = settings.value(QStringLiteral("ui/notifications"), true).toBool();
+    m_notificationSwitch->setChecked(notifEnabled);
+    connect(m_notificationSwitch, &QCheckBox::toggled, this, [](bool checked) {
+        QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+        s.setValue(QStringLiteral("ui/notifications"), checked);
+    });
+    notifLayout->addWidget(notifLabel);
+    notifLayout->addStretch();
+    notifLayout->addWidget(m_notificationSwitch);
+    wrapperLayout->addWidget(notifRow);
+
+    // ── 开机自启动 ──────────────────────────────────────────
+    auto *autoStartRow = new QFrame(wrapper);
     autoStartRow->setObjectName(QStringLiteral("settingsCard"));
     auto *rowLayout = new QHBoxLayout(autoStartRow);
     rowLayout->setContentsMargins(14, 12, 14, 12);
@@ -441,9 +493,9 @@ QWidget *MainWindow::createSettingsPage()
         }
     });
 
-    layout->addWidget(autoStartRow);
+    wrapperLayout->addWidget(autoStartRow);
 
-    auto *startupModeRow = new QFrame(content);
+    auto *startupModeRow = new QFrame(wrapper);
     startupModeRow->setObjectName(QStringLiteral("settingsCard"));
     auto *modeLayout = new QHBoxLayout(startupModeRow);
     modeLayout->setContentsMargins(14, 12, 14, 12);
@@ -468,9 +520,9 @@ QWidget *MainWindow::createSettingsPage()
     modeLayout->addStretch();
     modeLayout->addWidget(m_startupModeCombo);
 
-    layout->addWidget(startupModeRow);
+    wrapperLayout->addWidget(startupModeRow);
 
-    auto *githubRow = new QFrame(content);
+    auto *githubRow = new QFrame(wrapper);
     githubRow->setObjectName(QStringLiteral("settingsCard"));
     githubRow->setProperty("settingsCardVariant", QStringLiteral("link"));
     auto *githubLayout = new QHBoxLayout(githubRow);
@@ -512,15 +564,15 @@ QWidget *MainWindow::createSettingsPage()
     githubLayout->addWidget(githubButton, 1);
     githubLayout->addWidget(shareButton, 0, Qt::AlignRight);
 
-    layout->addWidget(githubRow);
+    wrapperLayout->addWidget(githubRow);
 
     // ========== 分析报告配置区域（独立栏目） ==========
-    auto *aiTitle = new QLabel(QStringLiteral("分析报告"), content);
+    auto *aiTitle = new QLabel(QStringLiteral("AI 分析报告"), wrapper);
     aiTitle->setObjectName(QStringLiteral("settingsSectionTitle"));
     aiTitle->setStyleSheet(QStringLiteral("font-size: 16px; font-weight: 600; margin-top: 12px;"));
 
     // 启用开关
-    auto *aiEnableRow = new QFrame(content);
+    auto *aiEnableRow = new QFrame(wrapper);
     aiEnableRow->setObjectName(QStringLiteral("settingsCard"));
     auto *aiEnableLayout = new QHBoxLayout(aiEnableRow);
     aiEnableLayout->setContentsMargins(14, 12, 14, 12);
@@ -561,11 +613,11 @@ QWidget *MainWindow::createSettingsPage()
     aiEnableLayout->addStretch();
     aiEnableLayout->addWidget(m_aiReportEnabledSwitch);
 
-    layout->addWidget(aiTitle);
-    layout->addWidget(aiEnableRow);
+    wrapperLayout->addWidget(aiTitle);
+    wrapperLayout->addWidget(aiEnableRow);
 
     // DeepSeek API Key 输入
-    auto *apiKeyRow = new QFrame(content);
+    auto *apiKeyRow = new QFrame(wrapper);
     apiKeyRow->setObjectName(QStringLiteral("settingsCard"));
     apiKeyRow->setProperty("settingsCardVariant", QStringLiteral("lineEdit"));
     auto *apiKeyLayout = new QHBoxLayout(apiKeyRow);
@@ -613,7 +665,7 @@ QWidget *MainWindow::createSettingsPage()
     apiKeyLayout->addStretch();
     apiKeyLayout->addWidget(m_deepseekApiKeyEdit);
 
-    layout->addWidget(apiKeyRow);
+    wrapperLayout->addWidget(apiKeyRow);
 
     // 连接启用开关
     connect(m_aiReportEnabledSwitch, &QCheckBox::toggled, this, [this](bool checked) {
@@ -628,11 +680,11 @@ QWidget *MainWindow::createSettingsPage()
     m_aiReportEnabledSwitch->setChecked(aiEnabled);
 
     // ========== 关于 ==========
-    auto *aboutTitle = new QLabel(QStringLiteral("帮助"), content);
+    auto *aboutTitle = new QLabel(QStringLiteral("帮助"), wrapper);
     aboutTitle->setObjectName(QStringLiteral("settingsSectionTitle"));
     aboutTitle->setStyleSheet(QStringLiteral("font-size: 16px; font-weight: 600; margin-top: 12px;"));
 
-    auto *versionRow = new QFrame(content);
+    auto *versionRow = new QFrame(wrapper);
     versionRow->setObjectName(QStringLiteral("settingsCard"));
     auto *versionLayout = new QHBoxLayout(versionRow);
     versionLayout->setContentsMargins(14, 12, 14, 12);
@@ -645,10 +697,10 @@ QWidget *MainWindow::createSettingsPage()
     versionLayout->addStretch();
     versionLayout->addWidget(m_versionLabel);
 
-    layout->addWidget(aboutTitle);
+    wrapperLayout->addWidget(aboutTitle);
 
     auto makeHelpRow = [&](const QString &labelText, const QString &buttonText, const auto &handler) {
-        auto *row = new QFrame(content);
+        auto *row = new QFrame(wrapper);
         row->setObjectName(QStringLiteral("settingsCard"));
         row->setProperty("settingsCardVariant", QStringLiteral("link"));
         auto *rowLayout = new QHBoxLayout(row);
@@ -663,7 +715,7 @@ QWidget *MainWindow::createSettingsPage()
         rowLayout->addWidget(label);
         rowLayout->addStretch();
         rowLayout->addWidget(button);
-        layout->addWidget(row);
+        wrapperLayout->addWidget(row);
     };
 
     makeHelpRow(QStringLiteral("关于"), QStringLiteral("Screen Time %1").arg(QStringLiteral(SCREENTIME_VERSION)), [this]() {
@@ -678,7 +730,7 @@ QWidget *MainWindow::createSettingsPage()
         QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Yiuk-max/Screen-Time")));
     });
 
-    layout->addWidget(versionRow);
+    wrapperLayout->addWidget(versionRow);
     layout->addStretch();
 
     scrollArea->setWidget(content);
@@ -704,28 +756,37 @@ void MainWindow::syncAIReportSettings()
 
 void MainWindow::applyCurrentTheme()
 {
-    applyTheme(loadSavedThemeKind());
+    applyTheme(loadSavedThemeKind(), loadSavedAccentColor());
 }
 
-void MainWindow::applyTheme(AppThemeKind kind)
+void MainWindow::applyTheme(AppThemeKind kind, AccentColor accent)
 {
-    m_theme = appThemeColors(kind);
+    m_theme = appThemeColors(kind, accent);
     saveThemeKind(kind);
+    saveAccentColor(accent);
 
-    if (m_themeCombo) {
+        if (m_themeCombo) {
         m_themeCombo->blockSignals(true);
         m_themeCombo->setCurrentIndex(kind == AppThemeKind::Light ? 1 : 0);
         m_themeCombo->blockSignals(false);
         m_themeCombo->setStyleSheet(comboBoxStyleSheet(m_theme));
     }
 
+        if (m_accentCombo) {
+        m_accentCombo->blockSignals(true);
+        m_accentCombo->setCurrentIndex(static_cast<int>(accent));
+        m_accentCombo->blockSignals(false);
+        m_accentCombo->setStyleSheet(comboBoxStyleSheet(m_theme));
+    }
+
     setStyleSheet(windowStyleSheet(m_theme));
     if (QWidget *central = centralWidget()) {
         central->setStyleSheet(QStringLiteral("background-color: %1;").arg(m_theme.windowBackground));
     }
-    if (m_leftSidebar) {
-        m_leftSidebar->setStyleSheet(QStringLiteral("background-color: transparent;"));
-    }
+        if (m_leftSidebar) {
+            m_leftSidebar->setStyleSheet(QStringLiteral("background-color: %1; border: none;")
+                                             .arg(m_theme.sideBarBackground));
+        }
     if (m_sidebarToggleButton) {
         m_sidebarToggleButton->setStyleSheet(sidebarToggleStyleSheet(m_theme));
     }
@@ -1131,11 +1192,14 @@ void MainWindow::closeEvent(QCloseEvent *event)
     // 点击关闭按钮时最小化到托盘，而不是退出
     event->ignore();
     hide();
-    m_trayIcon->showMessage(
-        QStringLiteral("Screen Time"),
-        QStringLiteral("程序已最小化到托盘，仍在后台记录使用时间"),
-        QSystemTrayIcon::Information,
-        2000);
+    QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    if (s.value(QStringLiteral("ui/notifications"), true).toBool()) {
+        m_trayIcon->showMessage(
+            QStringLiteral("Screen Time"),
+            QStringLiteral("程序已最小化到托盘，仍在后台记录使用时间"),
+            QSystemTrayIcon::Information,
+            2000);
+    }
 }
 
 void MainWindow::applySidebarMode(bool expanded)
@@ -1145,53 +1209,73 @@ void MainWindow::applySidebarMode(bool expanded)
         return;
     }
 
-    if (expanded) {
-        m_leftSidebar->setFixedWidth(190);
-        m_settingsButton->setFixedSize(176, 48);
-        m_settingsButton->setText(QStringLiteral("  设置和帮助"));
-        if (m_homeButton) {
-            m_homeButton->setFixedSize(176, 48);
-            m_homeButton->setText(QStringLiteral("  主页"));
+    const int targetWidth = expanded ? 190 : 68;
+
+    // Animate sidebar width with OutCubic easing
+    auto *anim = new QPropertyAnimation(m_leftSidebar, "minimumWidth", this);
+    anim->setDuration(200);
+    anim->setStartValue(m_leftSidebar->width());
+    anim->setEndValue(targetWidth);
+    anim->setEasingCurve(QEasingCurve::OutCubic);
+
+    auto *animMax = new QPropertyAnimation(m_leftSidebar, "maximumWidth", this);
+    animMax->setDuration(200);
+    animMax->setStartValue(m_leftSidebar->maximumWidth());
+    animMax->setEndValue(targetWidth);
+    animMax->setEasingCurve(QEasingCurve::OutCubic);
+
+    connect(anim, &QPropertyAnimation::finished, this, [this, expanded]() {
+        m_leftSidebar->setFixedWidth(expanded ? 190 : 68);
+
+        if (expanded) {
+            m_settingsButton->setFixedSize(174, 44);
+            m_settingsButton->setText(QStringLiteral("  设置和帮助"));
+            if (m_homeButton) {
+                m_homeButton->setFixedSize(174, 44);
+                m_homeButton->setText(QStringLiteral("  主页"));
+            }
+            if (m_aiReportButton) {
+                m_aiReportButton->setFixedSize(174, 44);
+                m_aiReportButton->setText(QStringLiteral("  分析报告"));
+            }
+            const QString expandedStyle = navButtonStyleSheet(m_theme, true);
+            m_settingsButton->setStyleSheet(expandedStyle);
+            if (m_homeButton) {
+                m_homeButton->setStyleSheet(expandedStyle);
+                m_homeButton->setToolTip(QString());
+            }
+            if (m_aiReportButton) {
+                m_aiReportButton->setStyleSheet(expandedStyle);
+                m_aiReportButton->setToolTip(QString());
+            }
+            m_sidebarToggleButton->setText(QStringLiteral("\u2630"));
+            m_sidebarToggleButton->setToolTip(QString());
+            m_settingsButton->setToolTip(QString());
+        } else {
+            m_settingsButton->setFixedSize(44, 44);
+            m_settingsButton->setText(QString());
+            const QString collapsedStyle = navButtonStyleSheet(m_theme, false);
+            m_settingsButton->setStyleSheet(collapsedStyle);
+            if (m_homeButton) {
+                m_homeButton->setFixedSize(44, 44);
+                m_homeButton->setText(QString());
+                m_homeButton->setStyleSheet(collapsedStyle);
+                m_homeButton->setToolTip(QStringLiteral("返回主页"));
+            }
+            if (m_aiReportButton) {
+                m_aiReportButton->setFixedSize(44, 44);
+                m_aiReportButton->setText(QString());
+                m_aiReportButton->setStyleSheet(collapsedStyle);
+                m_aiReportButton->setToolTip(QStringLiteral("分析报告"));
+            }
+            m_sidebarToggleButton->setText(QStringLiteral("\u2261"));
+            m_sidebarToggleButton->setToolTip(QStringLiteral("展开菜单"));
+            m_settingsButton->setToolTip(QStringLiteral("设置和帮助"));
         }
-        if (m_aiReportButton) {
-            m_aiReportButton->setFixedSize(176, 48);
-            m_aiReportButton->setText(QStringLiteral("  分析报告"));
-        }
-        const QString expandedStyle = navButtonStyleSheet(m_theme, true);
-        m_settingsButton->setStyleSheet(expandedStyle);
-        if (m_homeButton) {
-            m_homeButton->setStyleSheet(expandedStyle);
-            m_homeButton->setToolTip(QString());
-        }
-        if (m_aiReportButton) {
-            m_aiReportButton->setStyleSheet(expandedStyle);
-            m_aiReportButton->setToolTip(QString());
-        }
-        m_sidebarToggleButton->setText(QStringLiteral("☰"));
-        m_sidebarToggleButton->setToolTip(QString());
-        m_settingsButton->setToolTip(QString());
-    } else {
-        m_leftSidebar->setFixedWidth(68);
-        m_settingsButton->setFixedSize(44, 44);
-        m_settingsButton->setText(QString());
-        const QString collapsedStyle = navButtonStyleSheet(m_theme, false);
-        m_settingsButton->setStyleSheet(collapsedStyle);
-        if (m_homeButton) {
-            m_homeButton->setFixedSize(44, 44);
-            m_homeButton->setText(QString());
-            m_homeButton->setStyleSheet(collapsedStyle);
-            m_homeButton->setToolTip(QStringLiteral("返回主页"));
-        }
-        if (m_aiReportButton) {
-            m_aiReportButton->setFixedSize(44, 44);
-            m_aiReportButton->setText(QString());
-            m_aiReportButton->setStyleSheet(collapsedStyle);
-            m_aiReportButton->setToolTip(QStringLiteral("分析报告"));
-        }
-        m_sidebarToggleButton->setText(QStringLiteral("≡"));
-        m_sidebarToggleButton->setToolTip(QStringLiteral("展开菜单"));
-        m_settingsButton->setToolTip(QStringLiteral("设置和帮助"));
-    }
+    });
+
+    anim->start(QAbstractAnimation::DeleteWhenStopped);
+    animMax->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 void MainWindow::clampUsageSplitter()

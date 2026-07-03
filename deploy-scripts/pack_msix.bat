@@ -30,15 +30,15 @@ echo [INFO] Output dir    : %MSIX_OUT_DIR%
 
 rmdir /s /q "%STAGING_DIR%" 2>nul
 mkdir "%STAGING_DIR%"
-mkdir "%STAGING_DIR%\Assets"
 if not exist "%MSIX_OUT_DIR%" mkdir "%MSIX_OUT_DIR%"
 
 echo [INFO] Copying application files...
 robocopy "%APP_DIR%" "%STAGING_DIR%" /MIR /NFL /NDL /NJH /NJS
-if errorlevel 1 (
+if errorlevel 8 (
     echo [ERROR] Failed to copy files to staging directory.
     exit /b 1
 )
+mkdir "%STAGING_DIR%\Assets"
 
 echo [INFO] Generating MSIX assets...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%generate_msix_assets.ps1" -OutputDir "%STAGING_DIR%\Assets"
