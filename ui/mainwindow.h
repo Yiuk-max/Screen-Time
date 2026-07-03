@@ -11,12 +11,12 @@
 #include <QMenu>
 #include <QTimer>
 #include <QVector>
+#include "fluenttoggleswitch.h"
 #include "apptheme.h"
 class Database;
 class HourlyChartWidget;
 class QListWidget;
 class QLabel;
-class QCheckBox;
 class QComboBox;
 class QLineEdit;
 class QPushButton;
@@ -69,7 +69,7 @@ private:
     QPushButton *m_aiReportButton = nullptr;
     QPushButton *m_settingsButton = nullptr;
     QPushButton *m_sidebarToggleButton = nullptr;
-    QCheckBox *m_autoStartSwitch = nullptr;
+        FluentToggleSwitch *m_autoStartSwitch = nullptr;
     QComboBox *m_startupModeCombo = nullptr;
     QLabel *m_primaryStatLabel = nullptr;
     HourlyChartWidget *m_hourlyChartWidget = nullptr;
@@ -91,7 +91,7 @@ private:
             QWidget *m_settingsContent = nullptr;
     QComboBox *m_themeCombo = nullptr;
     QComboBox *m_accentCombo = nullptr;
-    QCheckBox *m_notificationSwitch = nullptr;
+    FluentToggleSwitch *m_notificationSwitch = nullptr;
 
     QSystemTrayIcon *m_trayIcon = nullptr;  // 托盘图标
     QMenu *m_trayMenu = nullptr;            // 托盘右键菜单
@@ -100,7 +100,7 @@ private:
     QLabel *m_versionLabel = nullptr;
 
     // AI 周报配置（设置页面独立栏目）
-    QCheckBox *m_aiReportEnabledSwitch = nullptr;
+    FluentToggleSwitch *m_aiReportEnabledSwitch = nullptr;
     QLineEdit *m_deepseekApiKeyEdit = nullptr;
 };
 #endif // MAINWINDOW_H

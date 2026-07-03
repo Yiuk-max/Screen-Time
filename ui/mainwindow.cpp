@@ -3,6 +3,7 @@
 #include "hourlychartwidget.h"
 #include "aireportpage.h"
 #include "apptheme.h"
+#include "fluenttoggleswitch.h"
 #include <QApplication>
 #include <QCloseEvent>
 #include <QSystemTrayIcon>
@@ -399,36 +400,18 @@ QWidget *MainWindow::createSettingsPage()
     accentLayout->addWidget(m_accentCombo);
         wrapperLayout->addWidget(accentRow);
 
-    // ── 允许通知 ────────────────────────────────────────────
+        // ── 允许通知 ────────────────────────────────────────────
     auto *notifRow = new QFrame(wrapper);
     notifRow->setObjectName(QStringLiteral("settingsCard"));
     auto *notifLayout = new QHBoxLayout(notifRow);
     notifLayout->setContentsMargins(14, 12, 14, 12);
     notifLayout->setSpacing(12);
     auto *notifLabel = new QLabel(QStringLiteral("允许通知"), notifRow);
-    m_notificationSwitch = new QCheckBox(notifRow);
-    m_notificationSwitch->setCursor(Qt::PointingHandCursor);
-    m_notificationSwitch->setStyleSheet(QStringLiteral(
-        "QCheckBox::indicator {"
-        "  width: 44px; height: 24px; border-radius: 12px;"
-        "  background-color: rgb(95,95,102);"
-        "}"
-        "QCheckBox::indicator:checked {"
-        "  background-color: rgb(70,190,90);"
-        "}"
-        "QCheckBox::indicator::unchecked {"
-        "  image: none;"
-        "}"
-        "QCheckBox::indicator::checked {"
-        "  image: none;"
-        "}"
-        "QCheckBox::indicator {"
-        "  border: none;"
-        "}"));
+    m_notificationSwitch = new FluentToggleSwitch(notifRow);
     QSettings settings(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
     const bool notifEnabled = settings.value(QStringLiteral("ui/notifications"), true).toBool();
     m_notificationSwitch->setChecked(notifEnabled);
-    connect(m_notificationSwitch, &QCheckBox::toggled, this, [](bool checked) {
+    connect(m_notificationSwitch, &FluentToggleSwitch::toggled, this, [](bool checked) {
         QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
         s.setValue(QStringLiteral("ui/notifications"), checked);
     });
@@ -445,47 +428,15 @@ QWidget *MainWindow::createSettingsPage()
     rowLayout->setSpacing(12);
 
     auto *label = new QLabel(QStringLiteral("开机自启动"), autoStartRow);
-    m_autoStartSwitch = new QCheckBox(autoStartRow);
-    m_autoStartSwitch->setCursor(Qt::PointingHandCursor);
-    m_autoStartSwitch->setStyleSheet(QStringLiteral(
-        "QCheckBox::indicator {"
-        "  width: 44px; height: 24px; border-radius: 12px;"
-        "  background-color: rgb(95,95,102);"
-        "}"
-        "QCheckBox::indicator:checked {"
-        "  background-color: rgb(70,190,90);"
-        "}"
-        "QCheckBox::indicator::unchecked {"
-        "  image: none;"
-        "}"
-        "QCheckBox::indicator::checked {"
-        "  image: none;"
-        "}"
-        "QCheckBox::indicator {"
-        "  border: 1px solid rgb(76,76,82);"
-        "}"
-        "QCheckBox::indicator:checked {"
-        "  border: 1px solid rgb(70,190,90);"
-        "}"
-    ));
+        m_autoStartSwitch = new FluentToggleSwitch(autoStartRow);
 
-    // Add a moving thumb effect with a child label.
-    auto *thumb = new QLabel(m_autoStartSwitch);
-    thumb->setFixedSize(18, 18);
-    thumb->setStyleSheet(QStringLiteral("background-color: white; border-radius: 9px;"));
-    thumb->move(3, 3);
-    connect(m_autoStartSwitch, &QCheckBox::toggled, thumb, [thumb](bool checked) {
-        thumb->move(checked ? 23 : 3, 3);
-    });
+        rowLayout->addWidget(label);
+        rowLayout->addStretch();
+        rowLayout->addWidget(m_autoStartSwitch);
 
-    rowLayout->addWidget(label);
-    rowLayout->addStretch();
-    rowLayout->addWidget(m_autoStartSwitch);
-
-    const bool enabled = isAutoStartEnabled();
-    m_autoStartSwitch->setChecked(enabled);
-    thumb->move(enabled ? 23 : 3, 3);
-    connect(m_autoStartSwitch, &QCheckBox::toggled, this, [this](bool checked) {
+        const bool enabled = isAutoStartEnabled();
+        m_autoStartSwitch->setChecked(enabled);
+        connect(m_autoStartSwitch, &FluentToggleSwitch::toggled, this, [this](bool checked) {
         if (!setAutoStartEnabled(checked) && m_autoStartSwitch) {
             m_autoStartSwitch->blockSignals(true);
             m_autoStartSwitch->setChecked(!checked);
@@ -579,35 +530,7 @@ QWidget *MainWindow::createSettingsPage()
     aiEnableLayout->setSpacing(12);
 
     auto *aiEnableLabel = new QLabel(QStringLiteral("启用分析报告"), aiEnableRow);
-    m_aiReportEnabledSwitch = new QCheckBox(aiEnableRow);
-    m_aiReportEnabledSwitch->setCursor(Qt::PointingHandCursor);
-    // 复制开关样式，并添加白色滑块效果
-    const QString toggleSwitchStyle = QStringLiteral(
-        "QCheckBox::indicator {"
-        "  width: 44px; height: 24px; border-radius: 12px;"
-        "  background-color: rgb(95,95,102);"
-        "  border: 1px solid rgb(76,76,82);"
-        "}"
-        "QCheckBox::indicator:checked {"
-        "  background-color: rgb(70,190,90);"
-        "  border: 1px solid rgb(70,190,90);"
-        "}"
-        "QCheckBox::indicator:unchecked {"
-        "  image: none;"
-        "}"
-        "QCheckBox::indicator:checked {"
-        "  image: none;"
-        "}");
-    m_aiReportEnabledSwitch->setStyleSheet(toggleSwitchStyle);
-
-    // AI开关滑块
-    auto *aiThumb = new QLabel(m_aiReportEnabledSwitch);
-    aiThumb->setFixedSize(18, 18);
-    aiThumb->setStyleSheet(QStringLiteral("background-color: white; border-radius: 9px;"));
-    aiThumb->move(3, 3);
-    connect(m_aiReportEnabledSwitch, &QCheckBox::toggled, aiThumb, [aiThumb](bool checked) {
-        aiThumb->move(checked ? 23 : 3, 3);
-    });
+        m_aiReportEnabledSwitch = new FluentToggleSwitch(aiEnableRow);
 
     aiEnableLayout->addWidget(aiEnableLabel);
     aiEnableLayout->addStretch();
@@ -668,7 +591,7 @@ QWidget *MainWindow::createSettingsPage()
     wrapperLayout->addWidget(apiKeyRow);
 
     // 连接启用开关
-    connect(m_aiReportEnabledSwitch, &QCheckBox::toggled, this, [this](bool checked) {
+    connect(m_aiReportEnabledSwitch, &FluentToggleSwitch::toggled, this, [this](bool checked) {
         QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
         s.setValue(QStringLiteral("ai/enabled"), checked);
         syncAIReportSettings();

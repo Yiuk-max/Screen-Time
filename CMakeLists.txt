@@ -39,6 +39,8 @@ qt_add_executable(ScreenTime
 	    ui/aireportpage.h
 	    ui/apptheme.cpp
 	    ui/apptheme.h
+    ui/fluenttoggleswitch.cpp
+    ui/fluenttoggleswitch.h
     ui/mainwindow.cpp
     ui/mainwindow.h
     resources.qrc
