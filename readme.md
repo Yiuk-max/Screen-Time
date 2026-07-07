@@ -3,7 +3,9 @@
 一个基于 Qt 开发的 Windows 程序使用时间统计工具，帮助我们更好的使用电脑
 
 可统计当天和过去七天内，电脑使用总时间及各应用程序的使用时间。
-
+#项目已上架至微软商店
+现在你可以直接搜索"The screen time"安装
+或者通过链接"https://apps.microsoft.com/detail/9N99N8P4VR3H?hl=zh-hans-cn&gl=CN&ocid=pdpshare"
 ## 效果演示
 
 ![主界面](./screenshots/mainwindow.png)
