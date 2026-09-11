@@ -24,6 +24,8 @@ public:
     void setApiEndpoint(const QString &endpoint);
     void setModel(const QString &model);
     void setPromptTemplate(const QString &prompt);
+    // 设置 AI 报告的输出语言（英文语言名，如 "German"）。空或中文时输出中文。
+    void setOutputLanguage(const QString &languageName);
 
     void generateReport(AIReportKind kind,
                         const QList<UsageRecord> &records,
@@ -49,13 +51,16 @@ private:
                                  const QList<UsageRecord> &compareRecords) const;
     QString formatWeekComparison(int thisSeconds, int previousSeconds) const;
     int totalDurationSeconds(const QList<UsageRecord> &records) const;
-    static QString systemPromptForKind(AIReportKind kind);
+    QString systemPromptForKind(AIReportKind kind) const;
+    QString outputLanguageDirective() const;
+    bool isChineseOutput() const;
 
     QNetworkAccessManager m_networkManager;
     QString m_apiKey;
     QString m_apiEndpoint;
     QString m_model;
     QString m_promptTemplate;
+    QString m_outputLanguage = QStringLiteral("简体中文");
     QNetworkReply *m_currentReply = nullptr;
 };
 

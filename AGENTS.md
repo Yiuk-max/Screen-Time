@@ -64,6 +64,15 @@ The project uses:
    - UI code must never hardcode colors: custom-painted widgets read tokens from `ThemeManager::instance().theme()`
      and repaint on `themeChanged`; QSS-styled widgets rely on the global stylesheet (object names / dynamic properties).
 
+6. **i18n system** (`ui/i18n/`)
+   - `translationmanager.h/.cpp` — singleton `TranslationManager` with built-in string tables keyed by semantic keys
+     (e.g. `settings.theme`). Languages: `zh_CN` (base), `zh_TW`, `en`, `de`, `fr`, `nl`, `uk`, `hi`, `tg`.
+     Persists the choice to QSettings (`ui/language`), emits `languageChanged`, and sets `QLocale` default.
+   - UI strings are never hardcoded: use `i18n("key")`, or attach `i18nKey` / `i18nTooltipKey` via `i18nSetText()` /
+     `i18nSetToolTip()`. `i18nRetranslate(root)` walks a widget tree and re-applies those properties on language change;
+     `MainWindow::retranslateUi()` / `AIReportPage::retranslateUi()` also rebuild combos, nav labels and report blocks.
+   - The language setting row label is intentionally hardcoded English (`Language`) in every locale.
+
 ### Data Flow
 
 1. `Tracker` polls Windows every 5s → accumulates seconds per app

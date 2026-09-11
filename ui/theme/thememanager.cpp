@@ -315,10 +315,10 @@ QVector<ThemeOption> ThemeManager::themeOptions() const
 QVector<AccentOption> ThemeManager::accentOptions() const
 {
     return {
-        {AccentColor::Theme,  accentName(AccentColor::Theme)},
-        {AccentColor::Purple, accentName(AccentColor::Purple)},
-        {AccentColor::Blue,   accentName(AccentColor::Blue)},
-        {AccentColor::Orange, accentName(AccentColor::Orange)},
+        {AccentColor::Theme,  QStringLiteral("theme"),  accentName(AccentColor::Theme)},
+        {AccentColor::Purple, QStringLiteral("purple"), accentName(AccentColor::Purple)},
+        {AccentColor::Blue,   QStringLiteral("blue"),   accentName(AccentColor::Blue)},
+        {AccentColor::Orange, QStringLiteral("orange"), accentName(AccentColor::Orange)},
     };
 }
 

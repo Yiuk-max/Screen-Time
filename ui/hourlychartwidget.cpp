@@ -1,5 +1,6 @@
 #include "hourlychartwidget.h"
 
+#include "i18n/translationmanager.h"
 #include "theme/thememanager.h"
 
 #include <QEvent>
@@ -11,7 +12,7 @@ static QString formatDurationFromMinutes(int minutes)
 {
     const int hours = minutes / 60;
     const int mins = minutes % 60;
-    return QStringLiteral("%1小时%2分钟").arg(hours).arg(mins);
+    return i18n("duration.hm").arg(hours).arg(mins);
 }
 
 HourlyChartWidget::HourlyChartWidget(QWidget *parent)
@@ -92,7 +93,7 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
         p.drawLine(area.left(), y, area.right(), y);
 
         p.setPen(axisTextColor);
-        p.drawText(area.right() + 8, y + 5, QStringLiteral("%1 分钟").arg(minute));
+        p.drawText(area.right() + 8, y + 5, i18n("chart.minutes").arg(minute));
         p.setPen(gridPen);
     }
 
@@ -147,9 +148,9 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
         p.drawRoundedRect(tipRect.adjusted(0, 0, -1, -1), 12, 12);
 
         p.setPen(chartTheme.tooltipText);
-        QString summary = QStringLiteral("总时长 %1").arg(formatDurationFromMinutes(minutes));
+        QString summary = i18n("chart.total").arg(formatDurationFromMinutes(minutes));
         if (m_hourRangeTooltip) {
-            summary += QStringLiteral("  (%1时-%2时)").arg(m_hoverBucket).arg(m_hoverBucket + 1);
+            summary += i18n("chart.hour_range").arg(m_hoverBucket).arg(m_hoverBucket + 1);
         }
         p.drawText(tipRect.adjusted(12, 10, -12, -10), Qt::AlignLeft | Qt::AlignTop, summary);
 

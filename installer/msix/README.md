@@ -106,7 +106,7 @@ release-package\msix\ScreenTime_<版本>.msixupload  上传到 Partner Center �
 
 ```bat
 deploy-scripts\pack_msix.bat -Sign -DevSign -InstallCertificate
-Add-AppxPackage -Path release-package\msix\ScreenTime_0.1.0.msix
+Add-AppxPackage -Path release-package\msix\ScreenTime_2.0.msix
 ```
 
 `-InstallCertificate` 会把生成的 `ScreenTimeDev.cer` 装进

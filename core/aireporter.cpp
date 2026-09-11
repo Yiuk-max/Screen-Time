@@ -1,5 +1,6 @@
 #include "aireporter.h"
 #include "appnameresolver.h"
+#include "ui/i18n/translationmanager.h"
 
 #include <QDate>
 #include <QDateTime>
@@ -233,6 +234,29 @@ void AIReporter::setPromptTemplate(const QString &prompt)
     }
 }
 
+void AIReporter::setOutputLanguage(const QString &languageName)
+{
+    const QString trimmed = languageName.trimmed();
+    m_outputLanguage = trimmed.isEmpty() ? QStringLiteral("简体中文") : trimmed;
+}
+
+bool AIReporter::isChineseOutput() const
+{
+    return m_outputLanguage.startsWith(QStringLiteral("Chinese"), Qt::CaseInsensitive)
+        || m_outputLanguage.contains(QStringLiteral("中文"));
+}
+
+QString AIReporter::outputLanguageDirective() const
+{
+    if (isChineseOutput()) {
+        return QString();
+    }
+    return QStringLiteral(
+               "【输出语言要求】请使用%1撰写整份报告，包括所有标题、分节、分类名称、说明与建议；"
+               "不要输出中文。应用/软件名称使用%1中的常用名称，没有本地化名称时保留原名。\n\n")
+        .arg(m_outputLanguage);
+}
+
 void AIReporter::generateWeeklyReport(const QList<UsageRecord> &thisWeekRecords,
                                       const QList<UsageRecord> &previousWeekRecords)
 {
@@ -244,12 +268,12 @@ void AIReporter::generateReport(AIReportKind kind,
                                 const QList<UsageRecord> &compareRecords)
 {
     if (m_apiKey.isEmpty()) {
-        emit reportFailed(QStringLiteral("API Key 未设置"));
+        emit reportFailed(i18n("error.api_key_missing"));
         return;
     }
 
     if (records.isEmpty()) {
-        emit reportFailed(QStringLiteral("没有可用的使用记录数据"));
+        emit reportFailed(i18n("error.no_records"));
         return;
     }
 
@@ -304,7 +328,7 @@ void AIReporter::onReplyFinished()
     QJsonParseError error;
     const QJsonDocument doc = QJsonDocument::fromJson(data, &error);
     if (error.error != QJsonParseError::NoError) {
-        emit reportFailed(QStringLiteral("解析响应失败: %1").arg(error.errorString()));
+        emit reportFailed(i18n("error.parse_failed").arg(error.errorString()));
         return;
     }
 
@@ -312,13 +336,13 @@ void AIReporter::onReplyFinished()
     if (obj.contains(QStringLiteral("error"))) {
         const QJsonObject errObj = obj.value(QStringLiteral("error")).toObject();
         const QString message = errObj.value(QStringLiteral("message")).toString();
-        emit reportFailed(message.isEmpty() ? QStringLiteral("API 请求失败") : message);
+        emit reportFailed(message.isEmpty() ? i18n("error.request_failed") : message);
         return;
     }
 
     const QJsonArray choices = obj.value(QStringLiteral("choices")).toArray();
     if (choices.isEmpty()) {
-        emit reportFailed(QStringLiteral("AI 返回结果为空"));
+        emit reportFailed(i18n("error.empty_result"));
         return;
     }
 
@@ -327,25 +351,31 @@ void AIReporter::onReplyFinished()
     const QString content = message.value(QStringLiteral("content")).toString();
 
     if (content.isEmpty()) {
-        emit reportFailed(QStringLiteral("AI 返回内容为空"));
+        emit reportFailed(i18n("error.empty_content"));
         return;
     }
 
     emit reportGenerated(stripMarkdownForDisplay(content));
 }
 
-QString AIReporter::systemPromptForKind(AIReportKind kind)
+QString AIReporter::systemPromptForKind(AIReportKind kind) const
 {
     const QString reportName = kind == AIReportKind::Daily ? QStringLiteral("日") : QStringLiteral("周");
-    return QStringLiteral(
-               "你是专业的屏幕使用时间分析师。你必须严格依据用户消息中的「程序预计算数据」撰写中文%1报，"
+    QString prompt = QStringLiteral(
+               "你是专业的屏幕使用时间分析师。你必须严格依据用户消息中的「程序预计算数据」撰写%1报，"
                "不得编造时长、排名或环比数字。"
-               "报告中所有应用名称须写成中文常用名：数据里是 Windows 进程名（如 msedge.exe、LockApp.exe），"
+               "报告中所有应用名称须写成用户常用名：数据里是 Windows 进程名（如 msedge.exe、LockApp.exe），"
                "请结合路径、窗口标题、本地识别提示与你的知识判断真实软件（例如 msedge=微软 Edge，"
                "LockApp.exe=系统锁屏，HTGame.exe=异环，ScreenTime.exe=本程序）。"
                "对陌生进程请尽量准确推断，勿直接堆砌英文进程名。"
                "输出为纯文本：用「一、二、三」或「1. 2. 3.」分节，禁止 #、**、---、代码块等 Markdown 符号。")
         .arg(reportName);
+    if (!isChineseOutput()) {
+        prompt += QStringLiteral(" 请使用%1撰写整份报告（包括标题、分节、分类与说明），"
+                                 "不要输出中文；应用名称使用%1中的常用名称。")
+                      .arg(m_outputLanguage);
+    }
+    return prompt;
 }
 
 QString AIReporter::buildPrompt(AIReportKind kind,
@@ -358,13 +388,13 @@ QString AIReporter::buildPrompt(AIReportKind kind,
     const QString stats = buildStatisticsBlock(kind, records, compareRecords);
 
     if (kind == AIReportKind::Daily) {
-        return QStringLiteral(
+        return outputLanguageDirective() + QStringLiteral(
                    "请根据以下数据撰写「今日屏幕使用分析报告」。\n\n"
                    "【必须包含的章节】\n"
                    "一、总时长概览\n"
                    "二、分类统计（浏览器/开发/办公/游戏/通讯/系统/其他）\n"
                    "三、按小时使用分布与高峰时段\n"
-                   "四、Top10 应用列表（必须按下方 Top10 时长排序，写中文软件名）\n"
+                   "四、Top10 应用列表（必须按下方 Top10 时长排序）\n"
                    "五、上午(6-12点)主要做什么\n"
                    "六、下午(12-18点)主要做什么\n"
                    "七、使用习惯建议\n\n"
@@ -372,7 +402,7 @@ QString AIReporter::buildPrompt(AIReportKind kind,
             .arg(stats);
     }
 
-    return QStringLiteral(
+    return outputLanguageDirective() + QStringLiteral(
                "请根据以下数据撰写「本周屏幕使用分析报告」。\n\n"
                "【必须包含的章节】\n"
                "一、总时长概览\n"
@@ -380,7 +410,7 @@ QString AIReporter::buildPrompt(AIReportKind kind,
                "三、分类统计（浏览器/开发/办公/游戏/通讯/系统/其他）\n"
                "四、每日使用趋势（近7天逐日）\n"
                "五、高峰时段（按小时分布）\n"
-               "六、Top10 应用列表（必须严格按下方 Top10 排序与时长，写中文软件名）\n"
+               "六、Top10 应用列表（必须严格按下方 Top10 排序与时长）\n"
                "七、上午(6-12点)主要做什么\n"
                "八、下午(12-18点)主要做什么\n"
                "九、是否需要调整的习惯与具体建议\n\n"

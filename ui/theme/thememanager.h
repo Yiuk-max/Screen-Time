@@ -19,7 +19,8 @@ struct ThemeOption {
 
 struct AccentOption {
     AccentColor value = AccentColor::Theme;
-    QString name;
+    QString id;    // "theme" / "purple" / "blue" / "orange"
+    QString name;  // 中文名（翻译回退用）
 };
 
 // 全局主题管理器：

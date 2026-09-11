@@ -1,6 +1,7 @@
 #include "startupmanager.h"
 
 #include <QtGlobal>
+#include <QDebug>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -155,19 +156,25 @@ bool awaitAsync(IAsyncOperationBase *operation)
 // 获取当前包声明的 startupTask 对象，失败返回 nullptr。
 IStartupTask *acquireStartupTask()
 {
+    qInfo("[winrt] A ensureWinRt");
     if (!ensureWinRt()) {
+        qInfo("[winrt] A ensureWinRt -> failed");
         return nullptr;
     }
 
+    qInfo("[winrt] B makeHString class");
     HSTRING classId = makeHString(kStartupTaskClass);
     if (!classId) {
+        qInfo("[winrt] B makeHString -> null");
         return nullptr;
     }
+    qInfo("[winrt] C RoGetActivationFactory");
     IStartupTaskStatics *statics = nullptr;
     const HRESULT hr = RoGetActivationFactory(classId, kIIDStartupTaskStatics,
                                               reinterpret_cast<void **>(&statics));
     WindowsDeleteString(classId);
     if (FAILED(hr) || !statics) {
+        qInfo("[winrt] C RoGetActivationFactory -> failed");
         return nullptr;
     }
 
@@ -176,19 +183,24 @@ IStartupTask *acquireStartupTask()
         statics->Release();
         return nullptr;
     }
+    qInfo("[winrt] D GetAsync");
     IAsyncOperationStartupTask *operation = nullptr;
     const HRESULT getHr = statics->GetAsync(taskId, &operation);
     WindowsDeleteString(taskId);
     statics->Release();
     if (FAILED(getHr) || !operation) {
+        qInfo("[winrt] D GetAsync -> failed");
         return nullptr;
     }
 
     IStartupTask *task = nullptr;
+    qInfo("[winrt] E awaitAsync");
     if (awaitAsync(operation)) {
+        qInfo("[winrt] F GetResults");
         operation->GetResults(&task);
     }
     operation->Release();
+    qInfo("[winrt] G acquire done");
     return task;
 }
 
@@ -202,6 +214,42 @@ QSettings runKey()
     return QSettings(
         QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
         QSettings::NativeFormat);
+}
+
+// ── WinRT 安全网 ─────────────────────────────────────────────
+// 部分 Windows.ApplicationModel.* 的 WinRT API 在 MSIX 容器里可能
+// 因线程套间/环境问题导致访问违规（已实测 0xC0000005）。
+// 这里用一个「探测」标记：调用前置位、成功后清除；
+// 若下次启动发现标记仍在，说明上次在 WinRT 里崩了，则永久禁用
+// WinRT 相关查询，保证程序能正常打开。
+bool winrtDisabled()
+{
+    QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    return s.value(QStringLiteral("startup/winrt_disabled"), false).toBool();
+}
+
+void winrtHandlePreviousCrash()
+{
+    QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    if (s.value(QStringLiteral("startup/winrt_probe_running"), false).toBool()) {
+        s.setValue(QStringLiteral("startup/winrt_disabled"), true);
+        s.setValue(QStringLiteral("startup/winrt_probe_running"), false);
+        s.sync();
+    }
+}
+
+void winrtProbeBegin()
+{
+    QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    s.setValue(QStringLiteral("startup/winrt_probe_running"), true);
+    s.sync();
+}
+
+void winrtProbeEnd()
+{
+    QSettings s(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
+    s.setValue(QStringLiteral("startup/winrt_probe_running"), false);
+    s.sync();
 }
 
 } // namespace
@@ -236,14 +284,23 @@ bool StartupManager::isAutoStartEnabled()
 {
 #ifdef Q_OS_WIN
     if (isPackaged()) {
+        winrtHandlePreviousCrash();
+        if (winrtDisabled()) {
+            qInfo("[winrt] disabled, skip isAutoStartEnabled");
+            return false;
+        }
+        winrtProbeBegin();
         IStartupTask *task = acquireStartupTask();
         if (!task) {
+            winrtProbeEnd();
             return false;
         }
         INT32 state = kStartupTaskDisabled;
         task->get_State(&state);
         task->Release();
-        return isStartupStateEnabled(state);
+        const bool result = isStartupStateEnabled(state);
+        winrtProbeEnd();
+        return result;
     }
 
     QSettings key = runKey();
@@ -257,8 +314,15 @@ bool StartupManager::setAutoStartEnabled(bool enabled)
 {
 #ifdef Q_OS_WIN
     if (isPackaged()) {
+        winrtHandlePreviousCrash();
+        if (winrtDisabled()) {
+            return false;
+        }
+        winrtProbeBegin();
+
         IStartupTask *task = acquireStartupTask();
         if (!task) {
+            winrtProbeEnd();
             return false;
         }
 
@@ -286,6 +350,7 @@ bool StartupManager::setAutoStartEnabled(bool enabled)
             success = SUCCEEDED(task->Disable());
         }
         task->Release();
+        winrtProbeEnd();
         return success;
     }
 
@@ -316,32 +381,36 @@ bool StartupManager::launchedByAutoStart()
         return false;
     }
 
+    winrtHandlePreviousCrash();
+    if (winrtDisabled()) {
+        qInfo("[winrt] disabled, skip launchedByAutoStart");
+        return false;
+    }
+    winrtProbeBegin();
+
+    bool result = false;
     HSTRING classId = makeHString(kAppInstanceClass);
-    if (!classId) {
-        return false;
+    if (classId) {
+        IAppInstanceStatics *statics = nullptr;
+        const HRESULT hr = RoGetActivationFactory(classId, kIIDAppInstanceStatics,
+                                                  reinterpret_cast<void **>(&statics));
+        WindowsDeleteString(classId);
+        if (SUCCEEDED(hr) && statics) {
+            IActivatedEventArgs *eventArgs = nullptr;
+            const HRESULT getHr = statics->GetActivatedEventArgs(&eventArgs);
+            statics->Release();
+            if (SUCCEEDED(getHr) && eventArgs) {
+                INT32 kind = 0;
+                const HRESULT kindHr = eventArgs->get_Kind(&kind);
+                eventArgs->Release();
+                if (SUCCEEDED(kindHr)) {
+                    result = (kind == kActivationKindStartupTask);
+                }
+            }
+        }
     }
-    IAppInstanceStatics *statics = nullptr;
-    const HRESULT hr = RoGetActivationFactory(classId, kIIDAppInstanceStatics,
-                                              reinterpret_cast<void **>(&statics));
-    WindowsDeleteString(classId);
-    if (FAILED(hr) || !statics) {
-        return false;
-    }
-
-    IActivatedEventArgs *eventArgs = nullptr;
-    const HRESULT getHr = statics->GetActivatedEventArgs(&eventArgs);
-    statics->Release();
-    if (FAILED(getHr) || !eventArgs) {
-        return false;
-    }
-
-    INT32 kind = 0;
-    const HRESULT kindHr = eventArgs->get_Kind(&kind);
-    eventArgs->Release();
-    if (FAILED(kindHr)) {
-        return false;
-    }
-    return kind == kActivationKindStartupTask;
+    winrtProbeEnd();
+    return result;
 #else
     return false;
 #endif

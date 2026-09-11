@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(ScreenTime VERSION 0.1.0 LANGUAGES CXX)
+project(ScreenTime VERSION 2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -45,6 +45,8 @@ qt_add_executable(ScreenTime
 	    ui/theme/thememanager.h
 	    ui/theme/themestyles.cpp
 	    ui/theme/themestyles.h
+	    ui/i18n/translationmanager.cpp
+	    ui/i18n/translationmanager.h
     ui/fluenttoggleswitch.cpp
     ui/fluenttoggleswitch.h
     ui/mainwindow.cpp

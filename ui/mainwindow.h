@@ -25,6 +25,7 @@ class QScrollArea;
 class QSlider;
 class QFrame;
 class QToolButton;
+class QAction;
 class AIReportPage;
 class QShowEvent;
 class MainWindow : public QMainWindow
@@ -36,11 +37,13 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override; // 拦截关闭事件
+    void changeEvent(QEvent *event) override;      // 拦截最小化事件
     void showEvent(QShowEvent *event) override;   // 显示后再同步一次 DWM 标题栏
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void setupTrayIcon();                          // 初始化托盘
+    void hideToTray();                             // 隐藏到系统托盘并提示
 
     QWidget *createUsagePage();
     QWidget *createSettingsPage();
@@ -58,6 +61,11 @@ private:
     void clampUsageSplitter();
     void onThemeChanged(const Theme &theme);
     void refreshIcons(const Theme &theme);
+    void retranslateUi();
+    void rebuildThemeCombo();
+    void rebuildAccentCombo();
+    void rebuildStartupModeCombo();
+    void rebuildLanguageCombo();
     void syncAIReportSettings();
     QIcon iconForApp(const QString &appName) const;
     QString formatDuration(int seconds) const;
@@ -96,10 +104,13 @@ private:
             QWidget *m_settingsContent = nullptr;
     QComboBox *m_themeCombo = nullptr;
     QComboBox *m_accentCombo = nullptr;
+    QComboBox *m_languageCombo = nullptr;
     FluentToggleSwitch *m_notificationSwitch = nullptr;
 
     QSystemTrayIcon *m_trayIcon = nullptr;  // 托盘图标
     QMenu *m_trayMenu = nullptr;            // 托盘右键菜单
+    QAction *m_showAction = nullptr;        // 显示主窗口
+    QAction *m_quitAction = nullptr;        // 退出
     QToolButton *m_shareButton = nullptr;   // 项目链接按钮
 
     AIReportPage *m_aiReportPage = nullptr;

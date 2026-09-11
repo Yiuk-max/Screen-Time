@@ -129,7 +129,7 @@ if (-not $Version) {
         $Version = (Get-Content -Path $versionFile -TotalCount 1).Trim()
     }
 }
-if (-not $Version) { $Version = '0.1.0' }
+if (-not $Version) { $Version = '2.0' }
 $packageVersion = Convert-ToPackageVersion $Version
 
 # --- Validate inputs -------------------------------------------------------

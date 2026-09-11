@@ -11,7 +11,7 @@ set "EXE_NAME=ScreenTime.exe"
 set "VERSION_FILE=%SCRIPT_DIR%version.txt"
 
 for /f "usebackq delims=" %%V in ("%VERSION_FILE%") do set "APP_VERSION=%%V"
-if "%APP_VERSION%"=="" set "APP_VERSION=0.1.0"
+if "%APP_VERSION%"=="" set "APP_VERSION=2.0"
 
 set "EXE_PATH=%~1"
 set "BEST_SCORE=-1"

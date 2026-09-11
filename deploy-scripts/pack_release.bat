@@ -24,7 +24,7 @@ goto parse_args
 for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
 set "VERSION_FILE=%SCRIPT_DIR%version.txt"
 for /f "usebackq delims=" %%V in ("%VERSION_FILE%") do set "APP_VERSION=%%V"
-if "%APP_VERSION%"=="" set "APP_VERSION=0.1.0"
+if "%APP_VERSION%"=="" set "APP_VERSION=2.0"
 
 echo ========================================
 echo  Screen Time Release Packager
