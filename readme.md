@@ -23,7 +23,13 @@
 
 6.【设置】支持开机自启动，可以选择后台启动到托盘 或者 启动后显示程序
 
-7.【其它】你可以从设置里面跳转到本项目的github地址，以便下载最新版本
+7.【设置】支持多套界面主题：跟随系统、浅色、深色，以及六套中国传统色主题
+（鸢尾蓝、苋菜红、蕈紫、葱油绿、青矾绿、紫幽兰，均为纸白底 + 主色）。
+可另选强调色（跟随主题 / 紫色 / 蓝色 / 橙色）。
+主题由统一的语义化颜色 Token + Design Token 驱动，新增主题只需填写一套颜色，
+无需修改任何界面代码（详见 `ui/theme/`）。
+
+8.【其它】你可以从设置里面跳转到本项目的github地址，以便下载最新版本
 
 ## 运行要求
 
@@ -34,3 +40,23 @@
 |存储|100MB及以上|
 
 >第一次写readme，写的不好请见谅
+
+## 打包
+
+支持三种分发形式，均在 `release-package/` 目录下生成：
+
+| 形式 | 说明 |
+|----|----|
+| 免安装 zip | `ScreenTime_<版本>.zip`，解压即用 |
+| Inno Setup 安装包 | `ScreenTime_Setup_<版本>.exe` |
+| MSIX 包 | `msix/ScreenTime_<版本>.msix`（未签名） |
+| 商店上传包 | `msix/ScreenTime_<版本>.msixupload`（上传 Partner Center） |
+
+一键打包：
+
+```bat
+deploy-scripts\pack_release.bat
+```
+
+MSIX 版本的开机自启动通过系统 `startupTask` 实现（MSIX 下注册表 Run 项会被虚拟化而失效），
+详见 [installer/msix/README.md](installer/msix/README.md)。

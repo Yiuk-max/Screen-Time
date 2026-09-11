@@ -2,15 +2,17 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  xmlns:rescap5="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities/5"
+  IgnorableNamespaces="uap desktop rescap rescap5">
   <Identity
-    Name="YiukMax.ScreenTime"
-    Publisher="CN=Yiuk Labs"
+    Name="__MSIX_IDENTITY_NAME__"
+    Publisher="__MSIX_PUBLISHER__"
     Version="__MSIX_VERSION__"/>
   <Properties>
     <DisplayName>Screen Time</DisplayName>
-    <PublisherDisplayName>Yiuk-max</PublisherDisplayName>
+    <PublisherDisplayName>Yiuk</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Resources>
@@ -34,6 +36,25 @@
                     <uap:DefaultTile
                       Wide310x150Logo="Assets\Wide310x150Logo.png"/>
                   </uap:VisualElements>
+      <Extensions>
+        <!--
+          MSIX / AppX 包内的进程运行在容器里，HKCU\...\Run 注册表写入会被虚拟化，
+          永远不会触发系统登录自启动。开机自启动必须通过下面这个 startupTask
+          扩展声明，并由程序调用 Windows.ApplicationModel.StartupTask API 开关。
+
+          TaskId 必须与 core/startupmanager.cpp 中的 startupTaskId() 保持一致。
+          rescap5:ImmediateRegistration="true" 让任务在安装后立即注册，
+          无需用户先手动启动一次程序。
+        -->
+        <desktop:Extension Category="windows.startupTask"
+                           Executable="ScreenTime.exe"
+                           EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="ScreenTimeStartupTask"
+                               Enabled="true"
+                               DisplayName="Screen Time"
+                               rescap5:ImmediateRegistration="true"/>
+        </desktop:Extension>
+      </Extensions>
     </Application>
   </Applications>
   <Capabilities>

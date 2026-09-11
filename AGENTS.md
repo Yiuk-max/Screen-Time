@@ -52,6 +52,18 @@ The project uses:
    - Supports both hourly (24 bars) and daily (7 bars) modes
    - Hover tooltips showing top 3 apps per time bucket
 
+5. **Theme system** (`ui/theme/`)
+   - `theme.h` — semantic `ColorTokens` (background/sidebar/surface/elevated/text/border/accent/state/chart),
+     chart tokens, and `DesignTokens` (radii, border widths, spacing, font sizes, opacity, animation).
+     `ThemePalette` is the small set of raw colors a theme author fills; `buildColorTokens()` derives the rest.
+   - `thememanager.h/.cpp` — singleton `ThemeManager`: registers themes, holds current theme + accent override,
+     persists to QSettings, applies the global QSS/QPalette to `QApplication`, and emits `themeChanged`.
+     Built-in themes: `system`, `light`, `dark`, plus six traditional-color themes (`iris`, `amaranth`,
+     `mushroom`, `scallion`, `alum`, `plum` — each a paper background + ink accent).
+   - `themestyles.h/.cpp` — generates the global stylesheet and QPalette from tokens, plus themed SVG icons.
+   - UI code must never hardcode colors: custom-painted widgets read tokens from `ThemeManager::instance().theme()`
+     and repaint on `themeChanged`; QSS-styled widgets rely on the global stylesheet (object names / dynamic properties).
+
 ### Data Flow
 
 1. `Tracker` polls Windows every 5s → accumulates seconds per app
@@ -74,3 +86,5 @@ The project uses:
 - Uses wide-character Windows APIs (`W` suffix functions)
 - Database path uses `QStandardPaths::AppDataLocation` which resolves to `%APPDATA%/ScreenTime` on Windows
 - Startup launch mode stored in QSettings under `startup/launch_mode` key ("tray" or "window")
+- **Theme is decoupled from UI** — a new theme only fills a `ThemePalette`; no widget code changes are needed.
+  All colors/visual parameters come from tokens, and theme switches propagate via `ThemeManager::themeChanged`.

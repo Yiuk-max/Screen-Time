@@ -34,12 +34,23 @@ echo.
 
 if "%SKIP_BUILD%"=="0" (
     if "%EXE_PATH%"=="" (
-        echo [STEP 1/4] Build Release...
-        call "%SCRIPT_DIR%build_release.bat"
+        if exist "%SCRIPT_DIR%build_release.bat" (
+            echo [STEP 1/4] Build Release...
+            call "%SCRIPT_DIR%build_release.bat"
         if errorlevel 1 exit /b 1
     ) else (
+            echo [STEP 1/4] No build_release.bat found. Ensure the exe is up-to-date.
+            echo [STEP 1/4] Building with cmake...
+            pushd "%PROJECT_ROOT%"
+            cmake --build build --config Release 2>nul
+if errorlevel 1 (
+                echo [WARN] cmake build failed or no Release config. Using existing exe if available.
+)
+            popd
+)
+) else (
         echo [STEP 1/4] Build skipped, using provided exe.
-    )
+)
 ) else (
     echo [STEP 1/4] Build skipped.
 )
@@ -114,3 +125,4 @@ if exist "%PROJECT_ROOT%\release-package\msix\ScreenTime_%APP_VERSION%.msix" (
 )
 echo ========================================
 exit /b 0
+

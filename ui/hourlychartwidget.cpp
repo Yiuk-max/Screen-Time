@@ -1,5 +1,7 @@
 #include "hourlychartwidget.h"
 
+#include "theme/thememanager.h"
+
 #include <QEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -18,13 +20,9 @@ HourlyChartWidget::HourlyChartWidget(QWidget *parent)
     setMouseTracking(true);
     setMinimumHeight(0);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_chartTheme = appThemeColors(AppThemeKind::Dark).chart;
-}
-
-void HourlyChartWidget::setChartTheme(const ChartThemeColors &theme)
-{
-    m_chartTheme = theme;
-    update();
+    // 颜色全部来自当前 Theme，主题切换时自动重绘。
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this,
+            [this](const Theme &) { update(); });
 }
 
 void HourlyChartWidget::setDailyData(const QVector<int> &minutesByHour,
@@ -58,16 +56,16 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    p.fillRect(rect(), m_chartTheme.background);
+    const ChartTokens &chartTheme = ThemeManager::instance().theme().colors.chart;
+    p.fillRect(rect(), chartTheme.background);
 
     const QRect area = chartRect();
     if (area.width() <= 0 || area.height() <= 0) {
         return;
     }
 
-    const QColor gridColor = m_chartTheme.grid;
-    const QColor axisTextColor = m_chartTheme.axisText;
-    const QColor barColor = m_chartTheme.bar;
+    const QColor gridColor = chartTheme.grid;
+    const QColor axisTextColor = chartTheme.axisText;
     int maxMinutes = (m_fixedMaxMinutes > 0) ? m_fixedMaxMinutes : 30;
     if (m_fixedMaxMinutes <= 0) {
         for (int value : m_minutesByBucket) {
@@ -124,8 +122,9 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
 
         QRect barRect(x, y, w, barHeight);
         p.setPen(Qt::NoPen);
-        p.setBrush(barColor);
-        p.drawRoundedRect(barRect, 4, 4);
+        // 纯色柱：颜色来自主题图表 Token。
+        p.setBrush(chartTheme.bar);
+        p.drawRoundedRect(barRect, 3, 3);
     }
 
     if (m_hoverBucket >= 0 && m_hoverBucket < bucketCount) {
@@ -134,7 +133,7 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
         const int x0 = static_cast<int>(x0d);
         const int x1 = static_cast<int>(x1d);
 
-        p.setPen(QPen(m_chartTheme.hoverLine, 1, Qt::DashLine));
+        p.setPen(QPen(chartTheme.hoverLine, 1, Qt::DashLine));
         p.drawLine(x0, area.top(), x0, area.bottom());
         p.drawLine(x1, area.top(), x1, area.bottom());
 
@@ -143,11 +142,11 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
         const int shownTop = qMin(3, topApps.size());
         const int tipHeight = 52 + shownTop * 24;
         QRect tipRect(area.left() + area.width() / 2 - 170, area.top() + 8, 340, tipHeight);
-        p.setPen(Qt::NoPen);
-        p.setBrush(m_chartTheme.tooltipBackground);
-        p.drawRoundedRect(tipRect, 12, 12);
+        p.setPen(QPen(chartTheme.tooltipBorder, 1));
+        p.setBrush(chartTheme.tooltipBackground);
+        p.drawRoundedRect(tipRect.adjusted(0, 0, -1, -1), 12, 12);
 
-        p.setPen(m_chartTheme.tooltipText);
+        p.setPen(chartTheme.tooltipText);
         QString summary = QStringLiteral("总时长 %1").arg(formatDurationFromMinutes(minutes));
         if (m_hourRangeTooltip) {
             summary += QStringLiteral("  (%1时-%2时)").arg(m_hoverBucket).arg(m_hoverBucket + 1);
@@ -163,10 +162,10 @@ void HourlyChartWidget::paintEvent(QPaintEvent *event)
             if (!icon.isNull()) {
                 icon.paint(&p, iconRect);
             } else {
-                p.setBrush(m_chartTheme.placeholderIcon);
+                p.setBrush(chartTheme.placeholderIcon);
                 p.setPen(Qt::NoPen);
                 p.drawRoundedRect(iconRect, 3, 3);
-                p.setPen(m_chartTheme.tooltipText);
+                p.setPen(chartTheme.tooltipText);
             }
             p.drawText(tipRect.left() + 34, y + 13,
                        QStringLiteral("%1  %2").arg(appName, formatDurationFromMinutes(appMinutes)));

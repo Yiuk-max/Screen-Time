@@ -8,8 +8,6 @@
 #include <QVector>
 #include <QWidget>
 
-#include "apptheme.h"
-
 class HourlyChartWidget : public QWidget
 {
     Q_OBJECT
@@ -26,7 +24,6 @@ public:
                       bool hourRangeTooltip,
                       int fixedMaxMinutes = -1,
                       int tickIntervalMinutes = 30);
-    void setChartTheme(const ChartThemeColors &theme);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -45,7 +42,6 @@ private:
     bool m_hourRangeTooltip = false;
     int m_fixedMaxMinutes = -1;
     int m_tickIntervalMinutes = 30;
-    ChartThemeColors m_chartTheme = appThemeColors(AppThemeKind::Dark).chart;
 };
 
 #endif // HOURLYCHARTWIDGET_H

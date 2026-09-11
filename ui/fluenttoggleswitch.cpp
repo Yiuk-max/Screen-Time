@@ -1,4 +1,7 @@
 #include "fluenttoggleswitch.h"
+
+#include "theme/thememanager.h"
+
 #include <QMouseEvent>
 #include <QResizeEvent>
 #include <QEasingCurve>
@@ -12,18 +15,12 @@ FluentToggleSwitch::FluentToggleSwitch(QWidget *parent)
     setFixedSize(44, 24);
 
     m_animation = new QPropertyAnimation(this, "thumbPos", this);
-    m_animation->setDuration(180);
+    m_animation->setDuration(ThemeManager::instance().theme().design.animNormalMs);
     m_animation->setEasingCurve(QEasingCurve::OutCubic);
 
-    m_trackOff  = QColor(120, 120, 128);
-    m_trackOn   = QColor(70, 190, 90);
-    m_thumbColor = QColor(255, 255, 255);
-}
-
-void FluentToggleSwitch::setAccentColor(const QColor &color)
-{
-    m_trackOn = color;
-    update();
+    // 颜色随主题变化：切换后自动重绘。
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this,
+            [this](const Theme &) { update(); });
 }
 
 QSize FluentToggleSwitch::sizeHint() const
@@ -77,9 +74,11 @@ void FluentToggleSwitch::paintEvent(QPaintEvent * /*event*/)
     const double w = width();
     const double radius = h / 2.0;
 
+    const ColorTokens &c = ThemeManager::instance().theme().colors;
+    const QColor cOff = c.textMuted;
+    const QColor cOn = c.accent;
+
     // 轨道颜色根据 m_thumbPos 线性插值
-    const QColor &cOff = m_trackOff;
-    const QColor &cOn  = m_trackOn;
     const double t = m_thumbPos;
     const int r = static_cast<int>(cOff.red()   + (cOn.red()   - cOff.red())   * t);
     const int g = static_cast<int>(cOff.green() + (cOn.green() - cOff.green()) * t);
@@ -89,8 +88,8 @@ void FluentToggleSwitch::paintEvent(QPaintEvent * /*event*/)
     p.setBrush(QColor(r, g, b));
     p.drawRoundedRect(QRectF(0, 0, w, h), radius, radius);
 
-    // 白色滑块
-    p.setBrush(m_thumbColor);
+    // 滑块
+    p.setBrush(c.accentText);
     p.drawEllipse(thumbRect());
 }
 

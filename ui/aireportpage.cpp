@@ -75,7 +75,7 @@ AIReportPage::AIReportPage(Database *database, QWidget *parent)
     mainLayout->setSpacing(12);
 
     auto *title = new QLabel(QStringLiteral("使用分析报告"), this);
-    title->setStyleSheet(QStringLiteral("font-size: 20px; font-weight: 600;"));
+    title->setObjectName(QStringLiteral("pageTitle"));
     mainLayout->addWidget(title);
 
     auto *subtitle = new QLabel(QStringLiteral("基于屏幕使用数据生成分析报告"), this);
@@ -91,6 +91,9 @@ AIReportPage::AIReportPage(Database *database, QWidget *parent)
     m_generateTodayButton = new QPushButton(QStringLiteral("生成今日分析"), buttonRow);
     m_generateWeekButton = new QPushButton(QStringLiteral("生成本周分析"), buttonRow);
     m_exportButton = new QPushButton(QStringLiteral("导出全部"), buttonRow);
+    m_generateTodayButton->setObjectName(QStringLiteral("primaryButton"));
+    m_generateWeekButton->setObjectName(QStringLiteral("primaryButton"));
+    m_exportButton->setObjectName(QStringLiteral("primaryButton"));
     m_statusLabel = new QLabel(buttonRow);
     m_statusLabel->setObjectName(QStringLiteral("aiReportStatus"));
 
@@ -112,8 +115,11 @@ AIReportPage::AIReportPage(Database *database, QWidget *parent)
 
     m_scrollArea = new QScrollArea(this);
     m_scrollArea->setWidgetResizable(true);
+    m_scrollArea->setFrameShape(QFrame::NoFrame);
+    m_scrollArea->viewport()->setAutoFillBackground(false);
 
     m_reportsContainer = new QWidget(m_scrollArea);
+    m_reportsContainer->setAutoFillBackground(false);
     m_reportsLayout = new QVBoxLayout(m_reportsContainer);
     m_reportsLayout->setContentsMargins(0, 0, 10, 0);
     m_reportsLayout->setSpacing(12);
@@ -127,18 +133,6 @@ AIReportPage::AIReportPage(Database *database, QWidget *parent)
     connect(m_reporter, &AIReporter::requestProgress, this, &AIReportPage::onRequestProgress);
 
     loadReports();
-    applyTheme(m_theme);
-}
-
-void AIReportPage::applyTheme(const AppThemeColors &theme)
-{
-    m_theme = theme;
-    setStyleSheet(aiReportPageStyleSheet(theme));
-    m_scrollArea->setStyleSheet(scrollAreaStyleSheet(theme));
-    m_generateTodayButton->setStyleSheet(primaryButtonStyleSheet(theme));
-    m_generateWeekButton->setStyleSheet(primaryButtonStyleSheet(theme));
-    m_exportButton->setStyleSheet(primaryButtonStyleSheet(theme));
-    rebuildReportBlocks();
 }
 
 void AIReportPage::setAIEnabled(bool enabled)
@@ -418,8 +412,8 @@ QString AIReportPage::reportTitleText(const WeeklyReport &report) const
 void AIReportPage::addReportBlock(const WeeklyReport &report)
 {
     auto *block = new QFrame(m_reportsContainer);
+    block->setObjectName(QStringLiteral("aiReportBlock"));
     block->setProperty("reportId", report.reportId);
-    block->setStyleSheet(aiReportBlockStyleSheet(m_theme));
 
     auto *blockLayout = new QVBoxLayout(block);
     blockLayout->setContentsMargins(16, 12, 16, 12);

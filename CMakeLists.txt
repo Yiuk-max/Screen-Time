@@ -33,16 +33,24 @@ qt_add_executable(ScreenTime
 	    core/aireporter.h
 	    core/appnameresolver.cpp
 	    core/appnameresolver.h
+    core/startupmanager.cpp
+    core/startupmanager.h
     ui/hourlychartwidget.cpp
     ui/hourlychartwidget.h
 	    ui/aireportpage.cpp
 	    ui/aireportpage.h
-	    ui/apptheme.cpp
-	    ui/apptheme.h
+	    ui/theme/theme.cpp
+	    ui/theme/theme.h
+	    ui/theme/thememanager.cpp
+	    ui/theme/thememanager.h
+	    ui/theme/themestyles.cpp
+	    ui/theme/themestyles.h
     ui/fluenttoggleswitch.cpp
     ui/fluenttoggleswitch.h
     ui/mainwindow.cpp
     ui/mainwindow.h
+    ui/windowblur.cpp
+    ui/windowblur.h
     resources.qrc
 )
 
@@ -62,6 +70,10 @@ if(WIN32)
     target_link_libraries(ScreenTime PRIVATE
         user32
         psapi
+        # RoInitialize / RoGetActivationFactory / WindowsCreateString（MSIX 自启动）
+        runtimeobject
+        # DwmSetWindowAttribute / DwmExtendFrameIntoClientArea（毛玻璃主题）
+        dwmapi
     )
 
     if(MINGW)

@@ -3,6 +3,7 @@
 #define MAINWINDOW_H
 #include <QIcon>
 #include <QMainWindow>
+#include <QPixmap>
 #include <QMap>
 #include <QPushButton>
 #include <QSplitter>
@@ -12,7 +13,7 @@
 #include <QTimer>
 #include <QVector>
 #include "fluenttoggleswitch.h"
-#include "apptheme.h"
+#include "theme/theme.h"
 class Database;
 class HourlyChartWidget;
 class QListWidget;
@@ -21,8 +22,11 @@ class QComboBox;
 class QLineEdit;
 class QPushButton;
 class QScrollArea;
+class QSlider;
 class QFrame;
+class QToolButton;
 class AIReportPage;
+class QShowEvent;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -32,6 +36,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override; // 拦截关闭事件
+    void showEvent(QShowEvent *event) override;   // 显示后再同步一次 DWM 标题栏
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
@@ -51,8 +56,8 @@ private:
     void setStartupLaunchMode(const QString &mode) const;
         void applySidebarMode(bool expanded);
     void clampUsageSplitter();
-    void applyTheme(AppThemeKind kind, AccentColor accent = AccentColor::Purple);
-    void applyCurrentTheme();
+    void onThemeChanged(const Theme &theme);
+    void refreshIcons(const Theme &theme);
     void syncAIReportSettings();
     QIcon iconForApp(const QString &appName) const;
     QString formatDuration(int seconds) const;
@@ -83,7 +88,7 @@ private:
     QMap<QString, QIcon> m_appIconByName;
     QMap<QString, QString> m_appPathByName;
     bool m_sidebarExpanded = true;
-    AppThemeColors m_theme = appThemeColors(AppThemeKind::Dark);
+    Theme m_theme;
 
     QFrame *m_chartPanel = nullptr;
     QLabel *m_statsTitleLabel = nullptr;
@@ -95,6 +100,7 @@ private:
 
     QSystemTrayIcon *m_trayIcon = nullptr;  // 托盘图标
     QMenu *m_trayMenu = nullptr;            // 托盘右键菜单
+    QToolButton *m_shareButton = nullptr;   // 项目链接按钮
 
     AIReportPage *m_aiReportPage = nullptr;
     QLabel *m_versionLabel = nullptr;

@@ -17,9 +17,6 @@ public:
 
     QSize sizeHint() const override;
 
-    /// 设置开启状态的轨道颜色（默认绿色）
-    void setAccentColor(const QColor &color);
-
 public slots:
     /// 设置选中状态，带动画（如果 visible）
     void setChecked(bool checked, bool animated = true);
@@ -41,9 +38,6 @@ private:
     QPropertyAnimation *m_animation = nullptr;
     double m_thumbPos = 0.0;  // 0.0 = left, 1.0 = right
     bool m_checked = false;
-    QColor m_trackOff;
-    QColor m_trackOn;
-    QColor m_thumbColor;
 };
 
 #endif // FLUENTTOGGLESWITCH_H

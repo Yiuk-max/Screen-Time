@@ -59,9 +59,11 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 New-IconPng -Source $SourceIcon -Width 16 -Height 16 -Path (Join-Path $OutputDir "AppIcon16x16.png")
 New-IconPng -Source $SourceIcon -Width 32 -Height 32 -Path (Join-Path $OutputDir "AppIcon32x32.png")
 New-IconPng -Source $SourceIcon -Width 44 -Height 44 -Path (Join-Path $OutputDir "Square44x44Logo.png")
+New-IconPng -Source $SourceIcon -Width 71 -Height 71 -Path (Join-Path $OutputDir "Square71x71Logo.png")
 New-IconPng -Source $SourceIcon -Width 150 -Height 150 -Path (Join-Path $OutputDir "Square150x150Logo.png")
 New-IconPng -Source $SourceIcon -Width 310 -Height 150 -Path (Join-Path $OutputDir "Wide310x150Logo.png")
-New-IconPng -Source $SourceIcon -Width 512 -Height 512 -Path (Join-Path $OutputDir "StoreLogo.png")
+# Properties/Logo ("Store logo") must be 50x50 for Store certification.
+New-IconPng -Source $SourceIcon -Width 50 -Height 50 -Path (Join-Path $OutputDir "StoreLogo.png")
 New-IconPng -Source $SourceIcon -Width 512 -Height 512 -Path (Join-Path $OutputDir "StoreLogo512x512.png")
 
 Write-Host "[OK] MSIX assets generated from $SourceIcon in $OutputDir"

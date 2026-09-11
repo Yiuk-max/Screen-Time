@@ -17,36 +17,32 @@ set "EXE_PATH=%~1"
 set "BEST_SCORE=-1"
 
 if "%EXE_PATH%"=="" (
-    for /f "delims=" %%F in ('dir /b /s "%BUILD_DIR%\%EXE_NAME%" 2^>nul') do (
-        set "CAND=%%F"
-        set "SCORE=0"
-        if /i not "!CAND:mingw-release=!"=="!CAND!" set /a SCORE+=150
-        if /i not "!CAND:\Release\=!"=="!CAND!" set /a SCORE+=120
-        if /i not "!CAND:\release\=!"=="!CAND!" set /a SCORE+=120
-        if /i not "!CAND:-Release\=!"=="!CAND!" set /a SCORE+=120
-        if /i not "!CAND:\bin\=!"=="!CAND!" set /a SCORE+=20
-        if /i not "!CAND:Debug=!"=="!CAND!" set /a SCORE-=200
-        if /i not "!CAND:debug=!"=="!CAND!" set /a SCORE-=200
-        if !SCORE! gtr !BEST_SCORE! (
-            set "BEST_SCORE=!SCORE!"
-            set "EXE_PATH=!CAND!"
-        )
+    REM 按修改时间排序，取最新的 exe
+    for /f "delims=" %%F in ('dir /b /s /o-d "%BUILD_DIR%\%EXE_NAME%" 2^>nul') do (
+        if "!EXE_PATH!"=="" set "EXE_PATH=%%F"
     )
 )
-
 if "%EXE_PATH%"=="" (
     echo [ERROR] Could not find %EXE_NAME% under "%BUILD_DIR%".
-    echo [TIP] Build Release first:
-    echo        deploy-scripts\build_release.bat
+    echo [TIP] Build first:
+    echo        cmake --build build --config Release
     echo [TIP] Or pass exe path:
     echo        deploy_release.bat "D:\path\to\ScreenTime.exe"
     exit /b 1
 )
 
+REM 检查 exe 修改时间，提示是否太旧
+for %%I in ("%EXE_PATH%") do (
+    set "EXE_MTIME=%%~tI"
+    set "EXE_SIZE=%%~zI"
+)
+echo [INFO] Using exe: %EXE_PATH%
+echo [INFO] Modified : %EXE_MTIME%
+echo [INFO] Size     : %EXE_SIZE% bytes
+
 if /i not "%QT_DIR%"=="" (
     set "PATH=%QT_DIR%\bin;%PATH%"
 )
-
 where windeployqt >nul 2>nul
 if errorlevel 1 (
     if exist "D:\Qt\6.11.1\mingw_64\bin\windeployqt.exe" (
@@ -64,7 +60,6 @@ if errorlevel 1 (
 
 echo [INFO] Project root : %PROJECT_ROOT%
 echo [INFO] Version      : %APP_VERSION%
-echo [INFO] Source exe   : %EXE_PATH%
 echo [INFO] Output dir   : %APP_DIR%
 
 if exist "%APP_DIR%" (
@@ -73,8 +68,8 @@ if exist "%APP_DIR%" (
     if exist "%APP_DIR%" (
         echo [ERROR] Cannot remove "%APP_DIR%".
         echo [TIP] Close Screen Time if it is running from the release folder, then retry.
-        exit /b 1
-    )
+    exit /b 1
+)
 )
 mkdir "%APP_DIR%"
 
@@ -111,3 +106,4 @@ echo      %APP_DIR%
 echo [OK] Update zip ready:
 echo      %ZIP_PATH%
 exit /b 0
+
