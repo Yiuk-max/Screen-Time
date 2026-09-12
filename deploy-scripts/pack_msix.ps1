@@ -10,11 +10,8 @@
 #   pack_msix.bat -Sign -PfxPath cert.pfx -PfxPassword secret
 #   pack_msix.bat -InstallCertificate -Sign -DevSign
 #
-# Identity for the Store comes from Partner Center -> App identity:
-#   Name      : e.g. 12345Yiuk-max.ScreenTime
-#   Publisher : e.g. CN=1A2B3C4D-1234-5678-9ABC-DEF012345678
-# You can store them in installer\msix\store-identity.json:
-#   { "identityName": "12345Yiuk-max.ScreenTime", "publisher": "CN=1A2B..." }
+# Store identity values come from Partner Center -> Product identity.
+# Keep them in installer\msix\store-identity.json; command-line values win.
 
 [CmdletBinding()]
 param(
@@ -24,11 +21,13 @@ param(
     [string]$OutputDir,
     [string]$IdentityName,
     [string]$Publisher,
+    [string]$DisplayName,
+    [string]$PublisherDisplayName,
+    [string]$StoreId,
     [switch]$Sign,
     [string]$PfxPath,
     [string]$PfxPassword,
     [string]$TimestampUrl,
-    [string]$DevCertSubject = 'CN=Screen Time Development',
     [switch]$DevSign,
     [switch]$InstallCertificate,
     [switch]$NoUpload
@@ -43,7 +42,7 @@ if (-not $SourceDir) { $SourceDir = Join-Path $projectRoot 'release-package\Scre
 if (-not $Manifest)  { $Manifest  = Join-Path $projectRoot 'installer\msix\AppxManifest.xml' }
 if (-not $OutputDir) { $OutputDir = Join-Path $projectRoot 'release-package\msix' }
 
-if ($PfxPath -or $PfxPassword) { $Sign = $true }
+if ($PfxPath -or $PfxPassword -or $DevSign) { $Sign = $true }
 if (-not $PfxPassword -and $env:MSIX_PFX_PASSWORD) { $PfxPassword = $env:MSIX_PFX_PASSWORD }
 
 function Write-Step([string]$Message) {
@@ -102,13 +101,21 @@ if (Test-Path $identityFile) {
     try {
         $identity = Get-Content -Path $identityFile -Raw | ConvertFrom-Json
         if (-not $IdentityName -and $identity.identityName) { $IdentityName = $identity.identityName }
-        if (-not $Publisher   -and $identity.publisher)     { $Publisher   = $identity.publisher }
+        if (-not $Publisher -and $identity.publisher) { $Publisher = $identity.publisher }
+        if (-not $DisplayName -and $identity.displayName) { $DisplayName = $identity.displayName }
+        if (-not $PublisherDisplayName -and $identity.publisherDisplayName) {
+            $PublisherDisplayName = $identity.publisherDisplayName
+        }
+        if (-not $StoreId -and $identity.storeId) { $StoreId = $identity.storeId }
     } catch {
         Write-Warning "Could not parse $identityFile : $($_.Exception.Message)"
     }
 }
-if (-not $IdentityName) { $IdentityName = 'Yiuk.TheScreenTime' }
-if (-not $Publisher)    { $Publisher    = 'CN=6C42CCA0-F9A8-4179-A164-0152ECF29CAD' }
+if (-not $IdentityName)        { $IdentityName = 'Yiuk.TheScreenTime' }
+if (-not $Publisher)           { $Publisher = 'CN=6C42CCA0-F9A8-4179-A164-0152ECF29CAD' }
+if (-not $DisplayName)         { $DisplayName = 'The Screen Time' }
+if (-not $PublisherDisplayName) { $PublisherDisplayName = 'Yiuk' }
+if (-not $StoreId)             { $StoreId = '9N99N8P4VR3H' }
 
 # --- Resolve tools ---------------------------------------------------------
 $makeAppx = Find-SdkTool 'makeappx.exe'
@@ -142,9 +149,12 @@ $msixPath  = Join-Path $OutputDir ("ScreenTime_{0}.msix" -f $Version)
 Write-Host "========================================"
 Write-Host " Screen Time MSIX packager"
 Write-Host " Version : $Version ($packageVersion)"
-Write-Host " Identity: $IdentityName"
+Write-Host " Identity : $IdentityName"
 Write-Host " Publisher: $Publisher"
-Write-Host " Source  : $SourceDir"
+Write-Host " Name     : $DisplayName"
+Write-Host " Publisher display name: $PublisherDisplayName"
+Write-Host " Store ID : $StoreId"
+Write-Host " Source   : $SourceDir"
 Write-Host " Output  : $msixPath"
 Write-Host "========================================"
 
@@ -206,9 +216,10 @@ if ($Sign) {
         if (Test-Path $devPfx) { Remove-Item $devPfx -Force }
         if (Test-Path $devCer) { Remove-Item $devCer -Force }
 
+        # The signing certificate subject must exactly match Package/Identity/Publisher.
         $devCert = New-SelfSignedCertificate `
             -Type CodeSigningCert `
-            -Subject $DevCertSubject `
+            -Subject $Publisher `
             -FriendlyName 'Screen Time MSIX Development' `
             -KeyExportPolicy Exportable `
             -CertStoreLocation 'Cert:\CurrentUser\My' `
@@ -231,12 +242,8 @@ if ($Sign) {
         if (Test-Path $cerCandidate) { $certificatePath = $cerCandidate }
     }
 
-    # The manifest Publisher must be exactly the signing certificate subject.
-    if ($signerSubject) {
-        if ($Publisher -and $Publisher -ne $signerSubject) {
-            Write-Warning "Publisher '$Publisher' does not match signing certificate '$signerSubject'; using the certificate subject."
-        }
-        $Publisher = $signerSubject
+    if ($signerSubject -and $Publisher -ne $signerSubject) {
+        throw "Signing certificate subject '$signerSubject' does not match Store publisher '$Publisher'."
     }
 }
 
@@ -249,16 +256,45 @@ $manifestText = [System.IO.File]::ReadAllText($Manifest, [System.Text.Encoding]:
 $manifestText = $manifestText.Replace('__MSIX_VERSION__', $packageVersion)
 $manifestText = $manifestText.Replace('__MSIX_IDENTITY_NAME__', $IdentityName)
 $manifestText = $manifestText.Replace('__MSIX_PUBLISHER__', $Publisher)
+$manifestText = $manifestText.Replace('__MSIX_DISPLAY_NAME__', $DisplayName)
+$manifestText = $manifestText.Replace('__MSIX_PUBLISHER_DISPLAY_NAME__', $PublisherDisplayName)
+if ($manifestText -match '__MSIX_[A-Z_]+__') {
+    throw "AppxManifest.xml contains an unresolved MSIX placeholder."
+}
+
+# Validate Store-reserved identity values before creating the package.
+[xml]$manifestXml = $manifestText
+$namespace = New-Object System.Xml.XmlNamespaceManager($manifestXml.NameTable)
+$namespace.AddNamespace('f', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
+$identityNode = $manifestXml.SelectSingleNode('/f:Package/f:Identity', $namespace)
+$propertiesNode = $manifestXml.SelectSingleNode('/f:Package/f:Properties', $namespace)
+if (-not $identityNode -or $identityNode.GetAttribute('Name') -ne $IdentityName) {
+    throw "Manifest Identity/Name does not match '$IdentityName'."
+}
+if ($identityNode.GetAttribute('Publisher') -ne $Publisher) {
+    throw "Manifest Identity/Publisher does not match '$Publisher'."
+}
+if (-not $propertiesNode) {
+    throw "Manifest Properties element is missing."
+}
+$manifestDisplayName = $propertiesNode.SelectSingleNode('f:DisplayName', $namespace).InnerText
+$manifestPublisherName = $propertiesNode.SelectSingleNode('f:PublisherDisplayName', $namespace).InnerText
+if ($manifestDisplayName -cne $DisplayName) {
+    throw "Manifest Properties/DisplayName must exactly match reserved name '$DisplayName'."
+}
+if ($manifestPublisherName -cne $PublisherDisplayName) {
+    throw "Manifest Properties/PublisherDisplayName must exactly match '$PublisherDisplayName'."
+}
+if ($manifestText -notmatch 'windows\.startupTask' -or
+    $manifestText -notmatch 'ScreenTimeStartupTask') {
+    throw "AppxManifest.xml is missing the ScreenTime startup task."
+}
+if ($manifestText -match 'ImmediateRegistration' -or $manifestText -match 'rescap5') {
+    throw "AppxManifest.xml uses restricted immediateRegistration capability."
+}
+
 $manifestOut = Join-Path $layoutDir 'AppxManifest.xml'
 [System.IO.File]::WriteAllText($manifestOut, $manifestText, $utf8NoBom)
-
-# Sanity checks that keep the startup task working.
-if ($manifestText -notmatch 'windows\.startupTask') {
-    Write-Warning "AppxManifest.xml has no windows.startupTask extension; auto start will not work."
-}
-if ($manifestText -notmatch 'ScreenTimeStartupTask') {
-    Write-Warning "AppxManifest.xml is missing the ScreenTimeStartupTask task id."
-}
 
 # --- Pack ------------------------------------------------------------------
 Write-Step "Packing MSIX"

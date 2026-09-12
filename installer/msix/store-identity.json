@@ -1,4 +1,7 @@
 {
   "identityName": "Yiuk.TheScreenTime",
-  "publisher": "CN=6C42CCA0-F9A8-4179-A164-0152ECF29CAD"
+  "publisher": "CN=6C42CCA0-F9A8-4179-A164-0152ECF29CAD",
+  "displayName": "The Screen Time",
+  "publisherDisplayName": "Yiuk",
+  "storeId": "9N99N8P4VR3H"
 }

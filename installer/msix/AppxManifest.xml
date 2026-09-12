@@ -4,15 +4,14 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  xmlns:rescap5="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities/5"
-  IgnorableNamespaces="uap desktop rescap rescap5">
+  IgnorableNamespaces="uap desktop rescap">
   <Identity
     Name="__MSIX_IDENTITY_NAME__"
     Publisher="__MSIX_PUBLISHER__"
     Version="__MSIX_VERSION__"/>
   <Properties>
-    <DisplayName>Screen Time</DisplayName>
-    <PublisherDisplayName>Yiuk</PublisherDisplayName>
+    <DisplayName>__MSIX_DISPLAY_NAME__</DisplayName>
+    <PublisherDisplayName>__MSIX_PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Resources>
@@ -28,7 +27,7 @@
       Executable="ScreenTime.exe"
       EntryPoint="Windows.FullTrustApplication">
                   <uap:VisualElements
-                    DisplayName="Screen Time"
+                    DisplayName="__MSIX_DISPLAY_NAME__"
                     Description="Windows 应用使用时间统计工具"
                     BackgroundColor="transparent"
                     Square150x150Logo="Assets\Square150x150Logo.png"
@@ -43,8 +42,7 @@
                            EntryPoint="Windows.FullTrustApplication">
           <desktop:StartupTask TaskId="ScreenTimeStartupTask"
                                Enabled="true"
-                               DisplayName="Screen Time"
-                               rescap5:ImmediateRegistration="true"/>
+                               DisplayName="__MSIX_DISPLAY_NAME__"/>
         </desktop:Extension>
       </Extensions>
     </Application>

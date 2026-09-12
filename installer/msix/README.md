@@ -1,12 +1,26 @@
-# MSIX 打包说明
+# MSIX 打包与签名
 
-## 前置条件
+## Microsoft Store 身份
 
-- Windows 10/11 SDK（提供 `makeappx.exe` 和 `signtool.exe`）
-- Qt 6 MinGW 工具链
-- 已通过 `deploy-scripts\deploy_release.bat` 生成 `release-package\ScreenTime`
+本项目对应的商店身份必须精确使用以下值：
 
-## 生成商店包
+| 字段 | 值 |
+|---|---|
+| `Package/Identity/Name` | `Yiuk.TheScreenTime` |
+| `Package/Identity/Publisher` | `CN=6C42CCA0-F9A8-4179-A164-0152ECF29CAD` |
+| `Package/Properties/DisplayName` | `The Screen Time` |
+| `Package/Properties/PublisherDisplayName` | `Yiuk` |
+| Package Family Name | `Yiuk.TheScreenTime_0dwpj9x918enj` |
+| Store ID | `9N99N8P4VR3H` |
+
+- Microsoft Store 深层链接：`ms-windows-store://pdp/?productid=9N99N8P4VR3H`
+- Web Store URL：<https://apps.microsoft.com/detail/9N99N8P4VR3H>
+
+这些值保存在 `installer/msix/store-identity.json`。其中 `DisplayName` 区分大小写，必须与 Partner Center 中保留的名称 **The Screen Time** 完全一致。
+
+## 生成商店上传包
+
+前置条件：Windows 10/11 SDK、Qt 6 MinGW，以及已经生成的 `release-package\ScreenTime`。
 
 ```bat
 deploy-scripts\pack_msix.bat
@@ -19,29 +33,11 @@ release-package\msix\ScreenTime_<版本>.msix
 release-package\msix\ScreenTime_<版本>.msixupload
 ```
 
-商店上传包不需要本地签名，Partner Center 会完成最终签名。
+提交 Microsoft Store 时无需自行签名；Partner Center 会使用微软证书完成签名。脚本会在打包前校验 Identity、Publisher、DisplayName 和 PublisherDisplayName，避免生成与商店保留身份不一致的软件包。
 
-## Microsoft Store 身份
+## 本地签名和旁加载
 
-将 Partner Center“产品标识”中的 Name 和 Publisher 写入
-`installer\msix\store-identity.json`：
-
-```json
-{
-  "identityName": "12345Publisher.ScreenTime",
-  "publisher": "CN=00000000-0000-0000-0000-000000000000"
-}
-```
-
-也可以通过命令行覆盖：
-
-```bat
-deploy-scripts\pack_msix.bat -IdentityName "12345Publisher.ScreenTime" -Publisher "CN=..."
-```
-
-## 本地旁加载
-
-生成并安装开发证书，然后构建签名包：
+生成主题与 Store Publisher 相同的开发证书，签名并安装证书：
 
 ```powershell
 deploy-scripts\pack_msix.bat -Sign -DevSign -InstallCertificate
@@ -54,13 +50,21 @@ Add-AppxPackage -Path release-package\msix\ScreenTime_2.0.msix
 deploy-scripts\pack_msix.bat -Sign -PfxPath certificate.pfx -PfxPassword password
 ```
 
-证书主题必须与清单中的 Publisher 一致。
+已有证书的 Subject 必须精确等于：
+
+```text
+CN=6C42CCA0-F9A8-4179-A164-0152ECF29CAD
+```
+
+签名只决定本地软件包是否可信，不会修复商店保留名称错误；名称和身份仍由 `store-identity.json` 及 `AppxManifest.xml` 决定。
 
 ## 开机自启动
 
-普通安装版使用 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`；MSIX 包使用清单中的 `windows.startupTask`。以下 TaskId 必须保持一致：
+普通安装版使用 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`；MSIX 使用清单中的 `windows.startupTask`。以下 TaskId 必须保持一致：
 
 - `installer/msix/AppxManifest.xml`：`ScreenTimeStartupTask`
 - `core/startupmanager.cpp`：`ScreenTimeStartupTask`
 
-使用 `Add-AppxPackage -Register` 注册解包目录时，系统可能不会完整注册 startupTask；验证自启动应使用真实安装的签名 MSIX 或商店版本。
+清单不使用受限的 `rescap5:ImmediateRegistration`，因此不需要为该功能申请商店审批。MSIX 安装后应至少启动一次应用，让程序查询并管理 StartupTask；用户也可以在“设置 → 应用 → 启动”中管理它。
+
+使用 `Add-AppxPackage -Register` 注册解包目录时，系统可能不会完整注册 startupTask；验证自启动应使用签名 MSIX 或商店版本。
