@@ -1,24 +1,34 @@
 # Screen Time
 
-一款使用 Qt 6 开发的 Windows 屏幕使用时间统计工具。它会在本地记录前台应用的使用时长，并提供当天、近七天和 AI 分析报告。
+[简体中文](#简体中文) · [English](#english)
 
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-下载安装-0078D4?logo=microsoft)](https://apps.microsoft.com/detail/9N99N8P4VR3H)
 
-## 界面预览
+> **支持的界面语言 / Supported interface languages**
+>
+> 简体中文 · 繁體中文 · English · Deutsch · Français · Nederlands · Українська · हिन्दी · Тоҷикӣ
 
-### 使用统计
+---
+
+## 简体中文
+
+一款使用 Qt 6 开发的 Windows 屏幕使用时间统计工具。它会在本地记录前台应用的使用时长，并提供当天、近七天和 AI 分析报告。
+
+### 界面预览
+
+#### 使用统计
 
 ![主界面](./screenshots/mainwindow.png)
 
 ![悬浮查看时段详情](./screenshots/mainwindow2.png)
 
-### 设置与 AI 报告
+#### 设置与 AI 报告
 
 ![设置](./screenshots/setting.png)
 
 ![AI 使用报告](./screenshots/report.png)
 
-## 功能
+### 功能
 
 - 统计当天和近七天的电脑使用时间
 - 按小时或日期显示柱状图，悬停可查看时段总时长和常用应用
@@ -26,17 +36,17 @@
 - 生成当天或本周的 AI 使用报告，支持导出历史报告
 - 支持系统托盘、开机自启动，以及启动到托盘或主窗口
 - 内置跟随系统、浅色、深色和六套传统色主题，并可单独选择强调色
-- 支持简体中文、繁體中文、English、Deutsch、Français、Nederlands、Українська、हिन्दी、Тоҷикӣ
+- 支持 9 种界面语言，切换后即时刷新，无需重启
 - 使用 SQLite 本地保存记录，默认位于 `%APPDATA%\ScreenTime\screen_time.db`
 
 > AI 报告需要用户自行填写 DeepSeek API Key；普通使用统计不依赖网络。
 
-## 系统要求
+### 系统要求
 
 - Windows 10 或 Windows 11
 - 约 100 MB 可用磁盘空间
 
-## 从源码构建
+### 从源码构建
 
 依赖：CMake 3.16+、支持 C++17 的编译器，以及带有 Core、GUI、Widgets、SQL、Charts、SVG、Network 模块的 Qt 6。
 
@@ -52,7 +62,7 @@ cmake --preset mingw-release
 cmake --build --preset mingw-release
 ```
 
-## 打包
+### 打包
 
 ```bat
 REM 构建、部署 Qt 依赖并生成全部发布包
@@ -73,12 +83,98 @@ deploy-scripts\pack_msix.bat
 
 MSIX 身份、签名和旁加载说明见 [installer/msix/README.md](installer/msix/README.md)。
 
-## 项目结构
+### 项目结构
 
 ```text
-core/          应用跟踪、数据库、自启动和 AI 报告
-ui/            主窗口、图表、主题和多语言
-installer/     Inno Setup 与 MSIX 清单
-deploy-scripts/构建及打包脚本
-screenshots/   README 界面截图
+core/           应用跟踪、数据库、自启动和 AI 报告
+ui/             主窗口、图表、主题和多语言
+installer/      Inno Setup 与 MSIX 清单
+deploy-scripts/ 构建及打包脚本
+screenshots/    README 界面截图
+```
+
+---
+
+## English
+
+Screen Time is a Windows usage tracker built with Qt 6. It records foreground application usage locally and provides daily, seven-day, and AI-generated reports.
+
+### Screenshots
+
+#### Usage statistics
+
+![Main window](./screenshots/mainwindow.png)
+
+![Hourly details on hover](./screenshots/mainwindow2.png)
+
+#### Settings and AI reports
+
+![Settings](./screenshots/setting.png)
+
+![AI usage report](./screenshots/report.png)
+
+### Features
+
+- Track total computer usage for today and the last seven days
+- Display usage by hour or day in a bar chart
+- Hover over a bar to view its total duration and most-used applications
+- View per-application usage and resize the chart and application list with a splitter
+- Generate AI reports for today or the current week and export saved reports
+- Run in the system tray and launch automatically into either the tray or main window
+- Choose from system, light, dark, and six traditional-color themes, with optional accent colors
+- Switch between nine interface languages without restarting the application
+- Store all usage records locally in SQLite at `%APPDATA%\ScreenTime\screen_time.db`
+
+> AI reports require a user-provided DeepSeek API key. Regular usage tracking works without an internet connection.
+
+### System requirements
+
+- Windows 10 or Windows 11
+- Approximately 100 MB of available disk space
+
+### Build from source
+
+Requirements: CMake 3.16+, a C++17-compatible compiler, and Qt 6 with the Core, GUI, Widgets, SQL, Charts, SVG, and Network modules.
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="D:/Qt/6.x.x/mingw_64"
+cmake --build build
+```
+
+You can also use the included MinGW presets. Update the Qt paths in `CMakePresets.json` first if your installation is located elsewhere.
+
+```bash
+cmake --preset mingw-release
+cmake --build --preset mingw-release
+```
+
+### Packaging
+
+```bat
+REM Build, deploy Qt dependencies, and create every release package
+deploy-scripts\pack_release.bat
+
+REM Create only the MSIX and Microsoft Store upload packages
+deploy-scripts\pack_msix.bat
+```
+
+Generated files are placed in `release-package/`:
+
+| Artifact | Purpose |
+|---|---|
+| `ScreenTime_<version>.zip` | Portable package |
+| `ScreenTime_Setup_<version>.exe` | Inno Setup installer |
+| `msix/ScreenTime_<version>.msix` | MSIX package |
+| `msix/ScreenTime_<version>.msixupload` | Microsoft Store upload package |
+
+See [installer/msix/README.md](installer/msix/README.md) for MSIX identity, signing, and sideloading instructions.
+
+### Project structure
+
+```text
+core/           Tracking, database, startup, and AI reporting
+ui/             Main window, charts, themes, and localization
+installer/      Inno Setup and MSIX manifests
+deploy-scripts/ Build and packaging scripts
+screenshots/    README screenshots
 ```
