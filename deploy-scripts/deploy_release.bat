@@ -86,10 +86,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if exist "%PROJECT_ROOT%\icons" (
-    xcopy "%PROJECT_ROOT%\icons" "%APP_DIR%\icons\" /E /I /Y >nul
-)
-
 set "ZIP_PATH=%RELEASE_ROOT%\ScreenTime_%APP_VERSION%.zip"
 if exist "%ZIP_PATH%" del /f /q "%ZIP_PATH%"
 

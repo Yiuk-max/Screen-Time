@@ -26,7 +26,6 @@ echo [INFO] Qt dir       : %QT_DIR%
 cmake -S "%PROJECT_ROOT%" -B "%BUILD_DIR%" -G "MinGW Makefiles" ^
     -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_PREFIX_PATH="%QT_DIR%" ^
-    -DCMAKE_C_COMPILER="%MINGW_DIR%\bin\gcc.exe" ^
     -DCMAKE_CXX_COMPILER="%MINGW_DIR%\bin\g++.exe"
 if errorlevel 1 exit /b 1
 

@@ -21,7 +21,6 @@ param(
     [string]$Version,
     [string]$SourceDir,
     [string]$Manifest,
-    [string]$IconsDir,
     [string]$OutputDir,
     [string]$IdentityName,
     [string]$Publisher,
@@ -42,7 +41,6 @@ $projectRoot = (Resolve-Path (Join-Path $scriptDir '..')).Path
 
 if (-not $SourceDir) { $SourceDir = Join-Path $projectRoot 'release-package\ScreenTime' }
 if (-not $Manifest)  { $Manifest  = Join-Path $projectRoot 'installer\msix\AppxManifest.xml' }
-if (-not $IconsDir)  { $IconsDir  = Join-Path $projectRoot 'icons' }
 if (-not $OutputDir) { $OutputDir = Join-Path $projectRoot 'release-package\msix' }
 
 if ($PfxPath -or $PfxPassword) { $Sign = $true }
@@ -137,7 +135,6 @@ if (-not (Test-Path $SourceDir)) {
     throw "Deployed app folder not found: $SourceDir`nRun deploy-scripts\deploy_release.bat first."
 }
 if (-not (Test-Path $Manifest)) { throw "AppxManifest.xml not found: $Manifest" }
-if (-not (Test-Path $IconsDir)) { throw "Icons folder not found: $IconsDir" }
 
 $layoutDir = Join-Path $OutputDir 'layout'
 $msixPath  = Join-Path $OutputDir ("ScreenTime_{0}.msix" -f $Version)
@@ -159,19 +156,16 @@ if (-not (Test-Path $OutputDir)) { New-Item -ItemType Directory -Path $OutputDir
 
 Copy-Item -Path (Join-Path $SourceDir '*') -Destination $layoutDir -Recurse -Force
 
-# The manifest references Assets\*, while windeployqt/deploy copies icons\*.
+# Generate every logo referenced by the manifest from icons\app.png.
 $assetsDir = Join-Path $layoutDir 'Assets'
 New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
 $assetGenerator = Join-Path $scriptDir 'generate_msix_assets.ps1'
-if (Test-Path $assetGenerator) {
-    Write-Host "Generating MSIX logos with generate_msix_assets.ps1"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $assetGenerator -OutputDir $assetsDir
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $assetsDir 'StoreLogo.png'))) {
-        Write-Warning "Asset generation failed; copying existing icons instead."
-        Copy-Item -Path (Join-Path $IconsDir '*') -Destination $assetsDir -Force
-    }
-} else {
-    Copy-Item -Path (Join-Path $IconsDir '*') -Destination $assetsDir -Force
+if (-not (Test-Path $assetGenerator)) {
+    throw "MSIX asset generator not found: $assetGenerator"
+}
+& powershell -NoProfile -ExecutionPolicy Bypass -File $assetGenerator -OutputDir $assetsDir
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $assetsDir 'StoreLogo.png'))) {
+    throw "MSIX asset generation failed."
 }
 
 # --- Resolve signing certificate (optional) --------------------------------

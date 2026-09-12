@@ -1,7 +1,5 @@
 {
-  "cmake.sourceDirectory": "${workspaceFolder}",
-  "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
+  "cmake.useCMakePresets": "always",
   "cmake.configureOnOpen": true,
-  "cmake.generator": "MinGW Makefiles",
   "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }
