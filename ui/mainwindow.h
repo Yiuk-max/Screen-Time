@@ -43,6 +43,7 @@ protected:
 
 private:
     void setupTrayIcon();                          // 初始化托盘
+    void ensureTrayIconVisible();                  // 登录早期等待 Explorer 托盘就绪
     void hideToTray();                             // 隐藏到系统托盘并提示
 
     QWidget *createUsagePage();
@@ -109,6 +110,8 @@ private:
 
     QSystemTrayIcon *m_trayIcon = nullptr;  // 托盘图标
     QMenu *m_trayMenu = nullptr;            // 托盘右键菜单
+    QTimer m_trayRetryTimer;                // 开机登录时等待系统托盘完成初始化
+    int m_trayRetryAttempts = 0;
     QAction *m_showAction = nullptr;        // 显示主窗口
     QAction *m_quitAction = nullptr;        // 退出
     QToolButton *m_shareButton = nullptr;   // 项目链接按钮

@@ -32,6 +32,10 @@ public:
     // 清单中声明的 startupTask TaskId，必须与 AppxManifest.xml 保持一致。
     static const char *startupTaskId();
 
+    // 隐藏的辅助进程入口：执行一次 WinRT 操作并返回退出码。
+    // 由主程序通过 CreateProcess 拉起，崩溃/卡死都不会影响主程序。
+    static int runWinRtHelper(const QString &operation);
+
 private:
     StartupManager() = delete;
 };

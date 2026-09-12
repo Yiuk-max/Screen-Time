@@ -6,6 +6,7 @@
 #include <QStandardPaths>
 #include <QStringList>
 #include <QSystemTrayIcon>
+#include <QTimer>
 
 #include "core/database.h"
 #include "core/startupmanager.h"
@@ -22,7 +23,6 @@
 #    define NOMINMAX
 #  endif
 #  include <windows.h>
-#  include <roapi.h>
 #endif
 
 namespace {
@@ -85,9 +85,34 @@ LONG WINAPI crashHandler(EXCEPTION_POINTERS *info)
     const quintptr address =
         (info && info->ExceptionRecord)
             ? reinterpret_cast<quintptr>(info->ExceptionRecord->ExceptionAddress) : 0;
-    logLine(QStringLiteral("!! CRASH code=0x%1 address=0x%2")
+
+    QString module = QStringLiteral("?");
+    HMODULE mod = nullptr;
+    if (address
+        && GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+                                  | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                              reinterpret_cast<LPCWSTR>(address), &mod)
+        && mod) {
+        wchar_t path[MAX_PATH] = {0};
+        if (GetModuleFileNameW(mod, path, MAX_PATH) > 0) {
+            const quintptr base = reinterpret_cast<quintptr>(mod);
+            module = QStringLiteral("%1+0x%2")
+                         .arg(QString::fromWCharArray(path))
+                         .arg(address - base, 0, 16);
+        }
+    }
+
+    QString access;
+    if (info && info->ExceptionRecord && info->ExceptionRecord->NumberParameters >= 2) {
+        access = QStringLiteral(" access=%1 target=0x%2")
+                     .arg(info->ExceptionRecord->ExceptionInformation[0])
+                     .arg(info->ExceptionRecord->ExceptionInformation[1], 0, 16);
+    }
+
+    logLine(QStringLiteral("!! CRASH code=0x%1 address=0x%2 module=%3%4")
                 .arg(code, 8, 16, QLatin1Char('0'))
-                .arg(address, 0, 16));
+                .arg(address, 0, 16)
+                .arg(module, access));
     return EXCEPTION_EXECUTE_HANDLER;
 }
 #endif
@@ -97,10 +122,20 @@ LONG WINAPI crashHandler(EXCEPTION_POINTERS *info)
 int main(int argc, char *argv[])
 {
 #ifdef Q_OS_WIN
-    // 关键：必须在 Qt 初始化 OLE 之前，把主线程初始化为 WinRT 单线程套间
-    // (ASTA)。否则 MSIX 环境下 Windows.ApplicationModel.*（StartupTask /
-    // AppInstance）会因套间不匹配触发访问违规(0xC0000005)。
-    RoInitialize(RO_INIT_SINGLETHREADED);
+    // 辅助进程模式：只执行一次 WinRT 操作就退出，不创建任何 Qt 对象。
+    // 这些 Windows.ApplicationModel 激活类 API 在 MSIX 全信任进程里出错时
+    // 会直接崩溃，放到子进程里跑可保证主程序永远能打开。
+    {
+        const QString commandLine = QString::fromWCharArray(GetCommandLineW());
+        const QString flag = QStringLiteral("--winrt-helper");
+        const int pos = commandLine.indexOf(flag);
+        if (pos >= 0) {
+            const QString rest = commandLine.mid(pos + flag.size()).trimmed();
+            const int space = rest.indexOf(QLatin1Char(' '));
+            const QString operation = (space >= 0 ? rest.left(space) : rest).trimmed();
+            return StartupManager::runWinRtHelper(operation);
+        }
+    }
 #endif
     QApplication app(argc, argv);
     qInstallMessageHandler(messageHandler);
@@ -116,6 +151,13 @@ int main(int argc, char *argv[])
     app.setOrganizationName(QStringLiteral("ScreenTime"));
     app.setApplicationName(QStringLiteral("ScreenTime"));
     app.setQuitOnLastWindowClosed(false); // 关键：关闭窗口不退出程序
+
+    // 必须在数据库和主窗口等耗时初始化之前捕获启动来源。MSIX startupTask
+    // 的 sihost/系统父进程可能很快退出，太晚查询会丢失父进程信息。
+    const bool launchedByAutoStart = StartupManager::launchedByAutoStart();
+    app.setProperty("launchedByAutoStart", launchedByAutoStart);
+    logLine(QStringLiteral("launch origin captured early: autoStart=%1")
+                .arg(launchedByAutoStart));
 
     // 主题与界面完全解耦：全局样式 / 调色板由 ThemeManager 统一提供，
     // 主题切换通过 themeChanged 信号通知各控件自行刷新。
@@ -135,21 +177,34 @@ int main(int argc, char *argv[])
     MainWindow window(&database);
     logLine(QStringLiteral("main window constructed"));
 
-    // 兼容两种自启动方式：传统 exe 的 --autostart 参数，以及 MSIX startupTask
-    // 激活（后者没有命令行参数，需要通过 AppInstance 激活参数判断）。
-    const bool launchedByAutoStart = StartupManager::launchedByAutoStart();
+    // 兼容两种自启动方式：传统 exe 的 --autostart 参数，以及 MSIX
+    // startupTask（后者没有命令行参数，启动来源已在初始化最前面捕获）。
     QSettings settings(QStringLiteral("ScreenTime"), QStringLiteral("ScreenTime"));
     const QString launchMode =
         settings.value(QStringLiteral("startup/launch_mode"), QStringLiteral("tray")).toString();
     const bool trayAvailable = QSystemTrayIcon::isSystemTrayAvailable();
-    logLine(QStringLiteral("launchedByAutoStart=%1 launchMode=%2 trayAvailable=%3")
+    logLine(QStringLiteral("launchedByAutoStart=%1 launchMode=%2 trayAvailableInitially=%3")
                 .arg(launchedByAutoStart).arg(launchMode).arg(trayAvailable));
 
-    // 只有在“自启动 + 托盘模式 + 托盘可用”时才隐藏；否则一律显示窗口，
-    // 避免因判断异常导致用户点开却看不到界面。
-    if (launchedByAutoStart && launchMode == QStringLiteral("tray") && trayAvailable) {
+    // Windows 10 登录早期，startupTask 可能早于 Explorer 的 Shell_TrayWnd
+    // 启动，此时 isSystemTrayAvailable() 会短暂返回 false。不能因此显示主窗；
+    // MainWindow 会在后台重试注册托盘图标。若两分钟后托盘仍不可用，再显示
+    // 主窗作为安全回退，避免产生用户无法操作的隐藏进程。
+    if (launchedByAutoStart && launchMode == QStringLiteral("tray")) {
         window.hide();
-        logLine(QStringLiteral("window hidden to tray"));
+        logLine(QStringLiteral("window hidden for autostart tray mode"));
+        if (!trayAvailable) {
+            QTimer::singleShot(120000, &window, [&window]() {
+                if (!QSystemTrayIcon::isSystemTrayAvailable()) {
+                    window.show();
+                    window.raise();
+                    window.activateWindow();
+                    logLine(QStringLiteral("tray unavailable after 120s; window shown as fallback"));
+                } else {
+                    logLine(QStringLiteral("tray became available; window remains hidden"));
+                }
+            });
+        }
     } else {
         window.show();
         logLine(QStringLiteral("window shown"));

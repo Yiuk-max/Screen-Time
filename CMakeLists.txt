@@ -72,11 +72,42 @@ if(WIN32)
     target_link_libraries(ScreenTime PRIVATE
         user32
         psapi
-        # RoInitialize / RoGetActivationFactory / WindowsCreateString（MSIX 自启动）
+        # WinRT / C++/WinRT（MSIX 自启动）
         runtimeobject
+        ole32
+        oleaut32
         # DwmSetWindowAttribute / DwmExtendFrameIntoClientArea（毛玻璃主题）
         dwmapi
     )
+
+    # MinGW 默认不会搜索 Windows SDK 的 C++/WinRT 头文件。找到 SDK 时，
+    # 仅让 startupmanager.cpp 使用 C++20 和官方 C++/WinRT ABI；其余项目仍
+    # 保持 C++17。找不到 SDK 时会继续使用源码中的最小 ABI 回退实现。
+    set(_windows_sdk_include_root "C:/Program Files (x86)/Windows Kits/10/Include")
+    if(DEFINED ENV{ProgramFiles})
+        get_filename_component(_program_files_parent "$ENV{ProgramFiles}" DIRECTORY)
+        set(_windows_sdk_include_root
+            "${_program_files_parent}/Program Files (x86)/Windows Kits/10/Include")
+    endif()
+    file(GLOB _cppwinrt_candidates LIST_DIRECTORIES true
+        "${_windows_sdk_include_root}/*/cppwinrt")
+    list(SORT _cppwinrt_candidates)
+    list(REVERSE _cppwinrt_candidates)
+    foreach(_cppwinrt_dir IN LISTS _cppwinrt_candidates)
+        if(EXISTS "${_cppwinrt_dir}/winrt/base.h")
+            target_include_directories(ScreenTime PRIVATE "${_cppwinrt_dir}")
+            target_compile_definitions(ScreenTime PRIVATE SCREENTIME_USE_CPPWINRT=1)
+            if(MSVC)
+                set_source_files_properties(core/startupmanager.cpp PROPERTIES
+                    COMPILE_OPTIONS "/std:c++20")
+            else()
+                set_source_files_properties(core/startupmanager.cpp PROPERTIES
+                    COMPILE_OPTIONS "-std=gnu++20")
+            endif()
+            message(STATUS "Screen Time: using C++/WinRT from ${_cppwinrt_dir}")
+            break()
+        endif()
+    endforeach()
 
     if(MINGW)
         find_program(WINDRES_EXECUTABLE windres)

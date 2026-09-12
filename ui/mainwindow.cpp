@@ -1210,7 +1210,16 @@ void MainWindow::setupTrayIcon()
     m_quitAction = m_trayMenu->addAction(i18n("tray.quit"));
 
     m_trayIcon->setContextMenu(m_trayMenu);
-    m_trayIcon->show();
+    ensureTrayIconVisible();
+
+    // 登录后 Explorer / Shell_TrayWnd 可能比 startupTask 晚数秒创建。
+    // QSystemTrayIcon 在此期间 show() 不一定会自动补注册，因此周期重试；
+    // 最长约两分钟，覆盖 Windows 10 登录阶段的慢机器。
+    m_trayRetryTimer.setInterval(2000);
+    connect(&m_trayRetryTimer, &QTimer::timeout, this, &MainWindow::ensureTrayIconVisible);
+    if (!m_trayIcon->isVisible() || !QSystemTrayIcon::isSystemTrayAvailable()) {
+        m_trayRetryTimer.start();
+    }
 
     // 单击托盘图标显示/隐藏窗口
     connect(m_trayIcon, &QSystemTrayIcon::activated, this,
@@ -1233,6 +1242,26 @@ void MainWindow::setupTrayIcon()
     });
 
     connect(m_quitAction, &QAction::triggered, qApp, &QApplication::quit);
+}
+
+void MainWindow::ensureTrayIconVisible()
+{
+    if (!m_trayIcon) {
+        return;
+    }
+
+    ++m_trayRetryAttempts;
+    if (m_trayRetryAttempts > 1) {
+        // 强制 Qt 重新发送 NIM_ADD，避免第一次 show() 发生在
+        // Shell_TrayWnd 尚未创建时只留下“逻辑可见”状态。
+        m_trayIcon->hide();
+    }
+    m_trayIcon->show();
+
+    const bool trayAvailable = QSystemTrayIcon::isSystemTrayAvailable();
+    if ((trayAvailable && m_trayIcon->isVisible()) || m_trayRetryAttempts >= 60) {
+        m_trayRetryTimer.stop();
+    }
 }
 
 void MainWindow::hideToTray()

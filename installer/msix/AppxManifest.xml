@@ -42,7 +42,11 @@
           永远不会触发系统登录自启动。开机自启动必须通过下面这个 startupTask
           扩展声明，并由程序调用 Windows.ApplicationModel.StartupTask API 开关。
 
+          Enabled="true" 让任务在安装后立即启用（配合 ImmediateRegistration），
+          用户/程序之后可以随意开关。
+
           TaskId 必须与 core/startupmanager.cpp 中的 startupTaskId() 保持一致。
+
           rescap5:ImmediateRegistration="true" 让任务在安装后立即注册，
           无需用户先手动启动一次程序。
         -->

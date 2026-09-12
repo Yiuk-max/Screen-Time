@@ -36,20 +36,49 @@ HKCU\Software\Microsoft\Windows\CurrentVersion\Run  ->  ScreenTime = "…\Screen
 ```
 
 `rescap5:ImmediateRegistration="true"` 让任务在**安装后立即注册**，
-用户不需要先手动启动一次程序。
+`Enabled="true"` 让任务在安装后**立即启用**，用户不需要先手动启动一次程序。
 
-### 2. 程序内用 WinRT API 读取 / 开关
+> 为什么不用 `Enabled="false"` 让程序首次运行再去开：
+> `Enabled="true"` 配合 `ImmediateRegistration` 能保证安装后立即注册并启用；
+> 即使应用尚未首次运行或设置页查询失败，自启动任务仍然存在。用户之后仍可
+> 在程序设置或“任务管理器 → 启动应用”里关闭。
+
+### 2. 程序内读取 / 开关
 
 封装在 `core/startupmanager.h` / `core/startupmanager.cpp`：
 
-- `isAutoStartEnabled()`  → `StartupTask.get_State()`
-- `setAutoStartEnabled()` → `StartupTask.RequestEnableAsync()` / `Disable()`
-- `launchedByAutoStart()` → `AppInstance.GetActivatedEventArgs().Kind == ActivationKind_StartupTask`
-  （startupTask 启动时没有命令行参数，必须靠它判断，才能决定是否启动到托盘）
+- `isAutoStartEnabled()`  → 辅助进程调 `StartupTask.get_State()`；
+  查询不可用时按清单默认值返回「已启用」
+- `setAutoStartEnabled()` → 辅助进程调 `StartupTask.RequestEnableAsync()` / `Disable()`
+- `launchedByAutoStart()` → **父进程判断**（不依赖会崩的 API）：
+  - 命令行含 `--autostart`（普通 exe / Inno Setup）→ true
+  - MSIX：父进程是 explorer / 终端等 → 用户启动，显示主界面；
+    父进程是 svchost 等系统进程 → startupTask 拉起，进托盘
+- `runWinRtHelper()` → 隐藏的辅助进程入口（`ScreenTime.exe --winrt-helper <op>`）
+
+### 3. WinRT ABI
+
+`startupmanager.cpp` 会在 CMake 找到 Windows SDK 的 `cppwinrt` 头文件时，
+单独使用 C++20 和官方 **C++/WinRT** 调用 `StartupTask`；项目其余代码仍是
+C++17。这样避免 MinGW 下手写参数化 `IAsyncOperation<T>` ABI 在部分
+Windows 10 机器上于 `GetAsync/GetResults` 附近触发 `0xC0000005`。
+
+构建机若没有 C++/WinRT 头文件，源码仍保留最小 ABI 回退实现，但不建议用
+该构建产物发布 MSIX。正式发布前请确认 CMake 输出包含：
+
+```
+Screen Time: using C++/WinRT from ...
+```
+
+### 4. 崩溃隔离
+
+所有 `Windows.ApplicationModel` 自启动相关调用都在一个独立的辅助进程里执行
+（`CreateProcess` 拉起，`WaitForSingleObject` 等 3s）。辅助进程崩溃/卡死不
+影响主程序，保证界面一定能打开。
 
 `TaskId` 必须与 `StartupManager::startupTaskId()` 里的字符串完全一致。
 
-未打包（普通 exe / Inno Setup）时，代码自动回退到原来的注册表方案，两套逻辑共用一个开关。
+未打包（普通 exe / Inno Setup）时，代码自动回退到注册表 Run 方案，两套逻辑共用一个开关。
 
 ## 三、打包（Store 版，无需本地证书）
 
@@ -122,16 +151,26 @@ Add-AppxPackage -Register "release-package\msix\layout\AppxManifest.xml"
 
 ## 六、验证开机自启动
 
-1. 安装后打开 **任务管理器 → 启动应用**，应能看到 **Screen Time**，状态“已启用”。
-2. 在程序“设置”里切换“开机自启动”，任务管理器里的状态会同步变化。
-3. 重启电脑，程序按“开机启动方式”在托盘或主界面启动。
+1. 安装完成后打开 **任务管理器 → 启动应用**，应能看到 **Screen Time**，状态“已启用”
+   （清单里 `Enabled="true"`，安装即启用，不需要先启动程序）。
+2. 重启电脑，程序应直接进托盘（默认“托盘”模式）。
+3. 设置 → 开机启动方式 可选“托盘 / 主界面”。
+
+> 调试日志：`%USERPROFILE%\ScreenTime_winrt.log`，正常会看到类似
+> `launch: parent=svchost.exe user=0`、`helper: query exit=...`。
 
 ## 七、常见问题
 
 - **启动应用里没有条目**：确认清单含 `windows.startupTask` 且
   `rescap5:ImmediateRegistration="true"`；用真实安装（Store 或签名 msix）而非 `-Register`。
-- **开关打不开 / 关了又打不开**：若用户曾在任务管理器里手动禁用，状态会变成
-  `DisabledByUser`，只能由用户在任务管理器重新启用，程序无权修改（会弹窗提示）。
+- **从旧版本升级后自启动异常**：请先卸载旧包再装新包（安装脚本会自动卸载），
+  旧版残留的启动项状态/“WinRT 已禁用”标记会一并清掉。
+- **开关打不开 / 关了又打不开**：先检查构建日志是否启用了 C++/WinRT；
+  仍失败时可到「任务管理器 → 启动应用」手动操作。用户曾在任务管理器禁用时，
+  Windows 可能返回 `DisabledByUser`，应用不能绕过用户选择重新开启。
+- **开机启动后停在主界面而不是托盘**：程序用父进程名判断。若日志里是
+  `launch: parent=<某个 shell 进程> user=1`，就会被当成用户启动而显示主界面；
+  如果是 `user=0`，则会进托盘。必要时把日志发回来。
 - **`0x800B0109` / 清单读取失败 `0x87E80034`**：签名证书有问题。
   用于 MSIX 的证书必须是终端实体代码签名证书，不能是 `BasicConstraints CA=TRUE`
   的 CA 证书（仓库里旧的 `installer\YiukLabs.pfx` 就是 CA 证书，已不再使用）。
