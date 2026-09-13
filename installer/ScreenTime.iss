@@ -3,7 +3,7 @@
 ; 先运行 deploy-scripts\deploy_release.bat 生成 release-package\ScreenTime
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0"
+  #define MyAppVersion "2.0.3"
 #endif
 
 #define MyAppName "Screen Time"

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(ScreenTime VERSION 2.0 LANGUAGES CXX)
+project(ScreenTime VERSION 2.0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -65,7 +65,30 @@ target_include_directories(ScreenTime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(ScreenTime PRIVATE SCREENTIME_VERSION="${PROJECT_VERSION}")
 
 if(WIN32)
-    target_link_libraries(ScreenTime PRIVATE user32 psapi runtimeobject dwmapi)
+    target_link_libraries(ScreenTime PRIVATE user32 psapi dwmapi runtimeobject ole32 oleaut32)
+
+    # Use the Windows SDK C++/WinRT ABI for the MSIX StartupTask helper.
+    # Only startupmanager.cpp needs C++20; the rest of the project stays C++17.
+    set(_sdk_include_root "C:/Program Files (x86)/Windows Kits/10/Include")
+    if(DEFINED ENV{ProgramFiles})
+        get_filename_component(_program_files_parent "$ENV{ProgramFiles}" DIRECTORY)
+        set(_sdk_include_root
+            "${_program_files_parent}/Program Files (x86)/Windows Kits/10/Include")
+    endif()
+    file(GLOB _cppwinrt_candidates LIST_DIRECTORIES true
+        "${_sdk_include_root}/*/cppwinrt")
+    list(SORT _cppwinrt_candidates)
+    list(REVERSE _cppwinrt_candidates)
+    foreach(_cppwinrt_dir IN LISTS _cppwinrt_candidates)
+        if(EXISTS "${_cppwinrt_dir}/winrt/base.h")
+            target_include_directories(ScreenTime PRIVATE "${_cppwinrt_dir}")
+            target_compile_definitions(ScreenTime PRIVATE SCREENTIME_USE_CPPWINRT=1)
+            set_source_files_properties(core/startupmanager.cpp PROPERTIES
+                COMPILE_OPTIONS "-std=gnu++20")
+            message(STATUS "Screen Time: using C++/WinRT from ${_cppwinrt_dir}")
+            break()
+        endif()
+    endforeach()
 
     if(MINGW)
         find_program(WINDRES_EXECUTABLE windres)

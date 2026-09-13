@@ -1,19 +1,23 @@
 #include "startupmanager.h"
 
+#include <QCoreApplication>
 #include <QtGlobal>
 
 #ifdef Q_OS_WIN
-// windows.h must precede appmodel.h with MinGW.
 #include <windows.h>
 #include <appmodel.h>
-#include <inspectable.h>
-#include <roapi.h>
-#include <winstring.h>
+#include <tlhelp32.h>
 
-#include <QCoreApplication>
+#ifdef SCREENTIME_USE_CPPWINRT
+#include <winrt/base.h>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.ApplicationModel.h>
+#endif
+
 #include <QDir>
 #include <QSettings>
-#include <cwchar>
+#include <QStringList>
+#include <string>
 
 #ifndef APPMODEL_ERROR_NO_PACKAGE
 #define APPMODEL_ERROR_NO_PACKAGE 15700L
@@ -21,309 +25,268 @@
 
 namespace {
 
-// MinGW 构建只需以下少量 WinRT ABI，用于访问 MSIX StartupTask。
-
-// Windows.ApplicationModel.Activation.ActivationKind
-constexpr INT32 kActivationKindStartupTask = 1020;
-
-// Windows.Foundation.AsyncStatus
-constexpr INT32 kAsyncStatusStarted = 0;
-constexpr INT32 kAsyncStatusCompleted = 1;
-
-// Windows.ApplicationModel.StartupTaskState
-constexpr INT32 kStartupTaskDisabled = 0;
-constexpr INT32 kStartupTaskDisabledByUser = 1;
-constexpr INT32 kStartupTaskEnabled = 2;
-constexpr INT32 kStartupTaskDisabledByPolicy = 3;
-constexpr INT32 kStartupTaskEnabledByPolicy = 4;
-
-// 运行库类名与任务 Id。
-constexpr wchar_t kStartupTaskClass[] = L"Windows.ApplicationModel.StartupTask";
-constexpr wchar_t kAppInstanceClass[] = L"Windows.ApplicationModel.AppInstance";
 constexpr wchar_t kStartupTaskId[] = L"ScreenTimeStartupTask";
 
-// IID_IStartupTaskStatics   {ee5b60bd-a148-41a7-b26e-e8b88a1e62f8}
-const GUID kIIDStartupTaskStatics = {
-    0xee5b60bd,
-    0xa148,
-    0x41a7,
-    {0xb2, 0x6e, 0xe8, 0xb8, 0x8a, 0x1e, 0x62, 0xf8}};
-// IID_IAppInstanceStatics   {9d11e77f-9ea6-47af-a6ec-46784c5ba254}
-const GUID kIIDAppInstanceStatics = {
-    0x9d11e77f,
-    0x9ea6,
-    0x47af,
-    {0xa6, 0xec, 0x46, 0x78, 0x4c, 0x5b, 0xa2, 0x54}};
-const GUID kIIDAsyncInfo = {
-    0x00000036,
-    0x0000,
-    0x0000,
-    {0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}};
+const QString kHelperFlag = QStringLiteral("--winrt-helper");
+constexpr DWORD kHelperTimeoutMs = 5000;
+constexpr DWORD kHelperTimeoutExit = 0xFFFFFFFFu;
 
-struct IStartupTask;
+constexpr int kHelperOk = 0;
+constexpr int kHelperError = 1;
+constexpr int kHelperEnabled = 10;
+constexpr int kHelperDisabled = 11;
+constexpr int kHelperDisabledByUser = 12;
+constexpr int kHelperDisabledByPolicy = 13;
 
-struct IAsyncOperationBase : public IInspectable {
-  virtual HRESULT STDMETHODCALLTYPE put_Completed(IInspectable *handler) = 0;
-  virtual HRESULT STDMETHODCALLTYPE get_Completed(IInspectable **handler) = 0;
-};
-
-struct IAsyncOperationStartupTask : public IAsyncOperationBase {
-  virtual HRESULT STDMETHODCALLTYPE GetResults(IStartupTask **result) = 0;
-};
-
-struct IAsyncOperationStartupTaskState : public IAsyncOperationBase {
-  virtual HRESULT STDMETHODCALLTYPE GetResults(INT32 *result) = 0;
-};
-
-struct IAsyncInfo : public IInspectable {
-  virtual HRESULT STDMETHODCALLTYPE get_Id(UINT32 *id) = 0;
-  virtual HRESULT STDMETHODCALLTYPE get_Status(INT32 *status) = 0;
-  virtual HRESULT STDMETHODCALLTYPE get_ErrorCode(HRESULT *errorCode) = 0;
-  virtual HRESULT STDMETHODCALLTYPE Cancel() = 0;
-  virtual HRESULT STDMETHODCALLTYPE Close() = 0;
-};
-
-// Windows.ApplicationModel.IStartupTask
-struct IStartupTask : public IInspectable {
-  virtual HRESULT STDMETHODCALLTYPE
-  RequestEnableAsync(IAsyncOperationStartupTaskState **operation) = 0;
-  virtual HRESULT STDMETHODCALLTYPE Disable() = 0;
-  virtual HRESULT STDMETHODCALLTYPE get_State(INT32 *value) = 0;
-  virtual HRESULT STDMETHODCALLTYPE get_TaskId(HSTRING *value) = 0;
-};
-
-// Windows.ApplicationModel.IStartupTaskStatics
-struct IStartupTaskStatics : public IInspectable {
-  virtual HRESULT STDMETHODCALLTYPE
-  GetForCurrentPackageAsync(IInspectable **operation) = 0;
-  virtual HRESULT STDMETHODCALLTYPE
-  GetAsync(HSTRING taskId, IAsyncOperationStartupTask **operation) = 0;
-};
-
-// Windows.ApplicationModel.Activation.IActivatedEventArgs
-struct IActivatedEventArgs : public IInspectable {
-  virtual HRESULT STDMETHODCALLTYPE get_Kind(INT32 *value) = 0;
-};
-
-// Windows.ApplicationModel.IAppInstanceStatics
-struct IAppInstanceStatics : public IInspectable {
-  virtual HRESULT STDMETHODCALLTYPE
-  get_RecommendedInstance(IInspectable **value) = 0;
-  virtual HRESULT STDMETHODCALLTYPE
-  GetActivatedEventArgs(IActivatedEventArgs **result) = 0;
-};
-
-bool ensureWinRt() {
-  static const bool initialized = []() {
-    const HRESULT hr = RoInitialize(RO_INIT_SINGLETHREADED);
-    return SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE;
-  }();
-  return initialized;
+bool isPackaged()
+{
+    UINT32 length = 0;
+    return GetCurrentPackageFullName(&length, nullptr) != APPMODEL_ERROR_NO_PACKAGE;
 }
 
-HSTRING makeHString(const wchar_t *text) {
-  if (!text) {
-    return nullptr;
-  }
-  HSTRING value = nullptr;
-  const UINT32 length = static_cast<UINT32>(std::wcslen(text));
-  if (FAILED(WindowsCreateString(text, length, &value))) {
-    return nullptr;
-  }
-  return value;
+QSettings runKey()
+{
+    return QSettings(
+        QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
+        QSettings::NativeFormat);
 }
 
-bool awaitAsync(IAsyncOperationBase *operation) {
-  if (!operation) {
-    return false;
-  }
+bool runHelperProcess(const QString &operation, DWORD *exitCode)
+{
+    const QString exePath = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
+    const QString commandLine =
+        QStringLiteral("\"%1\" %2 %3").arg(exePath, kHelperFlag, operation);
+    std::wstring command = commandLine.toStdWString();
 
-  IAsyncInfo *info = nullptr;
-  if (FAILED(operation->QueryInterface(kIIDAsyncInfo,
-                                       reinterpret_cast<void **>(&info))) ||
-      !info) {
-    return false;
-  }
+    STARTUPINFOW startupInfo;
+    ZeroMemory(&startupInfo, sizeof(startupInfo));
+    startupInfo.cb = sizeof(startupInfo);
 
-  INT32 status = kAsyncStatusStarted;
-  for (int i = 0; i < 1000; ++i) {
-    if (FAILED(info->get_Status(&status)) || status != kAsyncStatusStarted) {
-      break;
+    PROCESS_INFORMATION processInfo;
+    ZeroMemory(&processInfo, sizeof(processInfo));
+
+    LPWSTR commandLineBuffer = command.empty() ? nullptr : &command[0];
+    if (!CreateProcessW(nullptr, commandLineBuffer, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+                        nullptr, nullptr, &startupInfo, &processInfo)) {
+        return false;
     }
-    ::Sleep(10);
-  }
-  info->Release();
-  return status == kAsyncStatusCompleted;
+
+    DWORD code = kHelperTimeoutExit;
+    if (WaitForSingleObject(processInfo.hProcess, kHelperTimeoutMs) == WAIT_OBJECT_0) {
+        GetExitCodeProcess(processInfo.hProcess, &code);
+    } else {
+        TerminateProcess(processInfo.hProcess, kHelperTimeoutExit);
+    }
+
+    CloseHandle(processInfo.hThread);
+    CloseHandle(processInfo.hProcess);
+    *exitCode = code;
+    return true;
 }
 
-IStartupTask *acquireStartupTask() {
-  if (!ensureWinRt()) {
-    return nullptr;
-  }
+// MSIX StartupTask activation has no command-line marker and must not be
+// inspected through WinRT in the main Qt process. Infer it from the parent
+// process instead: interactive launches come from Explorer/Start Menu/terminals,
+// while StartupTask is launched by a system service such as sihost or svchost.
+DWORD parentProcessId()
+{
+    const DWORD self = GetCurrentProcessId();
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
 
-  HSTRING classId = makeHString(kStartupTaskClass);
-  if (!classId) {
-    return nullptr;
-  }
-  IStartupTaskStatics *statics = nullptr;
-  const HRESULT hr = RoGetActivationFactory(
-      classId, kIIDStartupTaskStatics, reinterpret_cast<void **>(&statics));
-  WindowsDeleteString(classId);
-  if (FAILED(hr) || !statics) {
-    return nullptr;
-  }
+    PROCESSENTRY32W entry;
+    ZeroMemory(&entry, sizeof(entry));
+    entry.dwSize = sizeof(entry);
 
-  HSTRING taskId = makeHString(kStartupTaskId);
-  if (!taskId) {
-    statics->Release();
-    return nullptr;
-  }
-  IAsyncOperationStartupTask *operation = nullptr;
-  const HRESULT getHr = statics->GetAsync(taskId, &operation);
-  WindowsDeleteString(taskId);
-  statics->Release();
-  if (FAILED(getHr) || !operation) {
-    return nullptr;
-  }
-
-  IStartupTask *task = nullptr;
-  if (awaitAsync(operation)) {
-    operation->GetResults(&task);
-  }
-  operation->Release();
-  return task;
+    DWORD parent = 0;
+    if (Process32FirstW(snapshot, &entry)) {
+        do {
+            if (entry.th32ProcessID == self) {
+                parent = entry.th32ParentProcessID;
+                break;
+            }
+        } while (Process32NextW(snapshot, &entry));
+    }
+    CloseHandle(snapshot);
+    return parent;
 }
 
-bool isStartupStateEnabled(INT32 state) {
-  return state == kStartupTaskEnabled || state == kStartupTaskEnabledByPolicy;
+QString processImageName(DWORD pid)
+{
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!process) {
+        return QString();
+    }
+
+    wchar_t buffer[MAX_PATH] = {0};
+    DWORD size = MAX_PATH;
+    QString name;
+    if (QueryFullProcessImageNameW(process, 0, buffer, &size)) {
+        name = QString::fromWCharArray(buffer);
+        const int slash = name.lastIndexOf(QLatin1Char('\\'));
+        if (slash >= 0) {
+            name = name.mid(slash + 1);
+        }
+        name = name.toLower();
+    }
+    CloseHandle(process);
+    return name;
 }
 
-QSettings runKey() {
-  return QSettings(
-      QStringLiteral("HKEY_CURRENT_"
-                     "USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
-      QSettings::NativeFormat);
-}
+bool parentLooksLikeUserLaunch()
+{
+    const DWORD parent = parentProcessId();
+    if (!parent) {
+        return false;
+    }
 
-bool isPackaged() {
-  UINT32 length = 0;
-  return GetCurrentPackageFullName(&length, nullptr) !=
-         APPMODEL_ERROR_NO_PACKAGE;
+    const QString name = processImageName(parent);
+    static const QStringList shellParents = {
+        QStringLiteral("explorer.exe"),
+        QStringLiteral("cmd.exe"),
+        QStringLiteral("powershell.exe"),
+        QStringLiteral("pwsh.exe"),
+        QStringLiteral("windowsterminal.exe"),
+        QStringLiteral("wt.exe"),
+        QStringLiteral("openconsole.exe"),
+        QStringLiteral("conhost.exe"),
+        QStringLiteral("devenv.exe"),
+        QStringLiteral("code.exe"),
+        QStringLiteral("startmenuexperiencehost.exe"),
+    };
+    return shellParents.contains(name);
 }
 
 } // namespace
 #endif // Q_OS_WIN
 
-bool StartupManager::isAutoStartEnabled() {
+bool StartupManager::isAutoStartEnabled()
+{
 #ifdef Q_OS_WIN
-  if (isPackaged()) {
-    IStartupTask *task = acquireStartupTask();
-    if (!task) {
-      return false;
-    }
-    INT32 state = kStartupTaskDisabled;
-    task->get_State(&state);
-    task->Release();
-    return isStartupStateEnabled(state);
-  }
-
-  QSettings key = runKey();
-  return key.contains(QStringLiteral("ScreenTime"));
-#else
-  return false;
-#endif
-}
-
-bool StartupManager::setAutoStartEnabled(bool enabled) {
-#ifdef Q_OS_WIN
-  if (isPackaged()) {
-    IStartupTask *task = acquireStartupTask();
-    if (!task) {
-      return false;
-    }
-
-    bool success = false;
-    if (enabled) {
-      INT32 state = kStartupTaskDisabled;
-      task->get_State(&state);
-      if (isStartupStateEnabled(state)) {
-        success = true;
-      } else if (state == kStartupTaskDisabledByUser ||
-                 state == kStartupTaskDisabledByPolicy) {
-        // 已被用户在“任务管理器 -> 启动”或组策略禁用，程序无法直接改回。
-        success = false;
-      } else {
-        IAsyncOperationStartupTaskState *operation = nullptr;
-        if (SUCCEEDED(task->RequestEnableAsync(&operation)) && operation) {
-          INT32 result = kStartupTaskDisabled;
-          if (awaitAsync(operation) &&
-              SUCCEEDED(operation->GetResults(&result))) {
-            success = isStartupStateEnabled(result);
-          }
-          operation->Release();
+    if (isPackaged()) {
+        DWORD code = kHelperTimeoutExit;
+        if (runHelperProcess(QStringLiteral("query"), &code)) {
+            if (code == kHelperEnabled) {
+                return true;
+            }
+            if (code == kHelperDisabled || code == kHelperDisabledByUser ||
+                code == kHelperDisabledByPolicy) {
+                return false;
+            }
         }
-      }
-    } else {
-      success = SUCCEEDED(task->Disable());
+        // The manifest declares the task enabled, so assume enabled if the
+        // isolated helper could not produce an answer.
+        return true;
     }
-    task->Release();
-    return success;
-  }
 
-  QSettings key = runKey();
-  if (enabled) {
-    const QString appPath =
-        QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
-    key.setValue(QStringLiteral("ScreenTime"),
-                 QStringLiteral("\"%1\" --autostart").arg(appPath));
-  } else {
-    key.remove(QStringLiteral("ScreenTime"));
-  }
-  key.sync();
-  return key.status() == QSettings::NoError;
+    return runKey().contains(QStringLiteral("ScreenTime"));
 #else
-  Q_UNUSED(enabled);
-  return false;
+    return false;
 #endif
 }
 
-bool StartupManager::launchedByAutoStart() {
-  if (QCoreApplication::arguments().contains(QStringLiteral("--autostart"))) {
-    return true;
-  }
+bool StartupManager::setAutoStartEnabled(bool enabled)
+{
+#ifdef Q_OS_WIN
+    if (isPackaged()) {
+        DWORD code = kHelperTimeoutExit;
+        if (!runHelperProcess(enabled ? QStringLiteral("enable") : QStringLiteral("disable"),
+                              &code)) {
+            return false;
+        }
+        return code == kHelperOk;
+    }
+
+    QSettings key = runKey();
+    if (enabled) {
+        const QString appPath = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
+        key.setValue(QStringLiteral("ScreenTime"),
+                     QStringLiteral("\"%1\" --autostart").arg(appPath));
+    } else {
+        key.remove(QStringLiteral("ScreenTime"));
+    }
+    key.sync();
+    return key.status() == QSettings::NoError;
+#else
+    Q_UNUSED(enabled);
+    return false;
+#endif
+}
+
+bool StartupManager::launchedByAutoStart()
+{
+    if (QCoreApplication::arguments().contains(QStringLiteral("--autostart"))) {
+        return true;
+    }
 
 #ifdef Q_OS_WIN
-  if (!isPackaged() || !ensureWinRt()) {
-    return false;
-  }
-
-  HSTRING classId = makeHString(kAppInstanceClass);
-  if (!classId) {
-    return false;
-  }
-  IAppInstanceStatics *statics = nullptr;
-  const HRESULT hr = RoGetActivationFactory(
-      classId, kIIDAppInstanceStatics, reinterpret_cast<void **>(&statics));
-  WindowsDeleteString(classId);
-  if (FAILED(hr) || !statics) {
-    return false;
-  }
-
-  IActivatedEventArgs *eventArgs = nullptr;
-  const HRESULT getHr = statics->GetActivatedEventArgs(&eventArgs);
-  statics->Release();
-  if (FAILED(getHr) || !eventArgs) {
-    return false;
-  }
-
-  INT32 kind = 0;
-  const HRESULT kindHr = eventArgs->get_Kind(&kind);
-  eventArgs->Release();
-  if (FAILED(kindHr)) {
-    return false;
-  }
-  return kind == kActivationKindStartupTask;
+    if (!isPackaged()) {
+        return false;
+    }
+    return !parentLooksLikeUserLaunch();
 #else
-  return false;
+    return false;
+#endif
+}
+
+int StartupManager::runWinRtHelper(const QString &operation)
+{
+#ifdef Q_OS_WIN
+#ifdef SCREENTIME_USE_CPPWINRT
+    try {
+        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        using winrt::Windows::ApplicationModel::StartupTask;
+        using winrt::Windows::ApplicationModel::StartupTaskState;
+
+        const auto task = StartupTask::GetAsync(kStartupTaskId).get();
+        if (!task) {
+            return kHelperError;
+        }
+
+        if (operation == QStringLiteral("query")) {
+            switch (task.State()) {
+            case StartupTaskState::Enabled:
+            case StartupTaskState::EnabledByPolicy:
+                return kHelperEnabled;
+            case StartupTaskState::DisabledByUser:
+                return kHelperDisabledByUser;
+            case StartupTaskState::DisabledByPolicy:
+                return kHelperDisabledByPolicy;
+            default:
+                return kHelperDisabled;
+            }
+        }
+
+        if (operation == QStringLiteral("enable")) {
+            const StartupTaskState state = task.State();
+            if (state == StartupTaskState::Enabled || state == StartupTaskState::EnabledByPolicy) {
+                return kHelperOk;
+            }
+            if (state == StartupTaskState::DisabledByUser ||
+                state == StartupTaskState::DisabledByPolicy) {
+                return kHelperError;
+            }
+            const StartupTaskState result = task.RequestEnableAsync().get();
+            return (result == StartupTaskState::Enabled ||
+                    result == StartupTaskState::EnabledByPolicy)
+                       ? kHelperOk
+                       : kHelperError;
+        }
+
+        if (operation == QStringLiteral("disable")) {
+            task.Disable();
+            return kHelperOk;
+        }
+    } catch (...) {
+        return kHelperError;
+    }
+#endif
+    Q_UNUSED(operation);
+    return kHelperError;
+#else
+    Q_UNUSED(operation);
+    return 0;
 #endif
 }

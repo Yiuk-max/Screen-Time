@@ -41,7 +41,7 @@ release-package\msix\ScreenTime_<版本>.msixupload
 
 ```powershell
 deploy-scripts\pack_msix.bat -Sign -DevSign -InstallCertificate
-Add-AppxPackage -Path release-package\msix\ScreenTime_2.0.msix
+Add-AppxPackage -Path release-package\msix\ScreenTime_2.0.3.msix
 ```
 
 也可以使用已有代码签名证书：
@@ -60,11 +60,8 @@ CN=6C42CCA0-F9A8-4179-A164-0152ECF29CAD
 
 ## 开机自启动
 
-普通安装版使用 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`；MSIX 使用清单中的 `windows.startupTask`。以下 TaskId 必须保持一致：
+普通安装版使用 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`；MSIX 使用清单中的 `windows.startupTask`，TaskId 为 `ScreenTimeStartupTask`。
 
-- `installer/msix/AppxManifest.xml`：`ScreenTimeStartupTask`
-- `core/startupmanager.cpp`：`ScreenTimeStartupTask`
-
-清单不使用受限的 `rescap5:ImmediateRegistration`，因此不需要为该功能申请商店审批。MSIX 安装后应至少启动一次应用，让程序查询并管理 StartupTask；用户也可以在“设置 → 应用 → 启动”中管理它。
+清单不使用受限的 `rescap5:ImmediateRegistration`，因此不需要为该功能申请商店审批。MSIX 的 StartupTask 由 Windows 管理，用户可以在“设置 → 应用 → 启动”中控制它。
 
 使用 `Add-AppxPackage -Register` 注册解包目录时，系统可能不会完整注册 startupTask；验证自启动应使用签名 MSIX 或商店版本。
